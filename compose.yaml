@@ -1,0 +1,8 @@
+services:
+  eventcrm-bot:
+    build: .
+    image: "${IMAGE_NAME:-ghcr.io/your-username/eventcrm-bot}"
+    platform: linux/amd64
+    environment:
+      - TOKEN=${TOKEN}
+    restart: unless-stopped 
