@@ -12,9 +12,10 @@ A privacy-focused networking assistant for event attendees, built with Telegram 
 - 🎯 **Event Focused**: Designed for conferences, meetups, and networking events
 - 📱 **QR Code Networking**: Generate visual QR codes for instant connections
 - ⚡ **Instant Connections**: One-tap networking with automatic profile sharing
-- 🏗️ **Auto Group Creation**: Smart group creation with multiple options:
-  - **Auto Mode**: One-click group creation via Telegram deep links
-  - **Manual Mode**: Step-by-step guided group setup
+- 🏗️ **Real Group Creation**: **NEW!** Automatic Telegram group creation using full Telegram API:
+  - **Actual Groups**: Creates real Telegram groups, not just instructions
+  - **Automatic Invites**: Users get working invite links delivered by the bot
+  - **Smart Fallback**: Falls back to manual instructions if API unavailable
   - **Batch Groups**: Create groups with multiple connections at once
 - 🤝 **Connection Management**: Track all your event connections and notes
 - 📊 **Profile System**: Comprehensive networking profiles (Name, Role, Project, Bio)
@@ -61,6 +62,31 @@ John Doe | VC | TechFund | Looking for AI startups
 Sarah Kim | Founder | AIChat | Building conversational AI
 ```
 
+## 🚀 NEW: Telegram API Group Creation
+
+EventCRM now supports **real Telegram group creation** using the full Telegram API! This creates actual groups instead of just providing instructions.
+
+### Quick Setup
+
+1. **Get Telegram API credentials** from https://my.telegram.org/apps
+2. **Add to your .env file**:
+   ```bash
+   TELEGRAM_API_ID=your_api_id
+   TELEGRAM_API_HASH=your_api_hash  
+   TELEGRAM_PHONE_NUMBER=+1234567890
+   ```
+3. **Run the bot** and complete 2FA authentication on first start
+4. **Test group creation** with `/creategroup [user_id]`
+
+### What's New
+
+- ✅ **Real Groups**: Creates actual Telegram groups programmatically
+- ✅ **Automatic Invites**: Bot sends working invite links to all participants
+- ✅ **Smart Fallback**: Falls back to manual instructions if API unavailable
+- ✅ **Secure Sessions**: Session files stored securely for authentication
+
+📖 **Full Setup Guide**: See [TELEGRAM_API_SETUP.md](./TELEGRAM_API_SETUP.md) for detailed instructions
+
 ## ROFL Deployment
 
 This bot is designed to run on Oasis ROFL for maximum privacy and security.
@@ -70,6 +96,7 @@ This bot is designed to run on Oasis ROFL for maximum privacy and security.
 1. Install [Oasis CLI](https://docs.oasis.io/build/rofl/quickstart)
 2. Create Telegram bot with [@BotFather](https://t.me/BotFather)
 3. Get TEST tokens from [Oasis Faucet](https://faucet.testnet.oasis.io/)
+4. **NEW**: Set up Telegram API credentials (see above)
 
 ### Setup
 
@@ -147,12 +174,14 @@ Built for ETHGlobal Cannes - Build with ROFL hackathon:
 
 ## Future Enhancements
 
-- [ ] Actual Telegram group creation
-- [ ] QR code image generation
+- [x] **Actual Telegram group creation** ✅ **COMPLETED**
+- [x] **QR code image generation** ✅ **COMPLETED**
 - [ ] Advanced profile matching
 - [ ] Event-specific networking
 - [ ] Cross-chain identity verification
 - [ ] AI-powered connection suggestions
+- [ ] Group management features (admin controls, member management)
+- [ ] Advanced invite link settings (expiration, member limits)
 
 ## Contributing
 
@@ -170,11 +199,11 @@ MIT License - see LICENSE file for details
 
 EventCRM features intelligent group creation with multiple modes:
 
-### 🚀 Auto Mode
-- **One-click creation**: Scan QR → Connect → Create Group button
-- **Telegram deep links**: Uses native Telegram group creation
-- **Automatic invitations**: Both users get notified and invited
-- **Pre-filled names**: Smart group naming based on user profiles
+### 🚀 Smart Group Creation
+- **Multiple options**: Setup instructions, contact sharing, or direct chat
+- **Real Telegram links**: Uses working `tg://user?id=` format for direct messages
+- **Contact exchange**: Share detailed contact information for easy group creation
+- **Step-by-step guidance**: Clear instructions for manual group setup
 
 ### 📋 Manual Mode  
 - **Step-by-step guide**: Clear instructions for manual group setup
@@ -189,7 +218,8 @@ EventCRM features intelligent group creation with multiple modes:
 - **Custom group names**: Auto-generated names based on members' projects
 
 ### Technical Notes
-- **Telegram API limitations**: Bots can't create groups directly with arbitrary users
+- **Telegram API limitations**: Bots cannot create groups directly with arbitrary users
 - **Privacy restrictions**: Users must have interacted with the bot first
-- **Deep link approach**: Uses Telegram's native group creation for best UX
-- **Manual fallback**: Always provides alternative setup methods 
+- **Working solutions**: Uses real Telegram deep links (`tg://user?id=`) for direct messaging
+- **User-friendly fallbacks**: Provides multiple working alternatives for group creation
+- **No fake parameters**: Eliminates non-existent API calls that cause blank screens 

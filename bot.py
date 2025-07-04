@@ -10,6 +10,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
+from telegram_api import telegram_api, initialize_telegram_api, close_telegram_api
 
 load_dotenv()
 
@@ -402,7 +403,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data.startswith("create_group_"):
-        # Handle auto group creation
+        # Handle auto group creation using actual Telegram API
         target_user_id = int(query.data.replace("create_group_", ""))
         user_id = query.from_user.id
         
@@ -410,91 +411,87 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_profile = user_profiles[target_user_id]
         
         try:
-            # Method 1: Try to create actual group chat
+            # Create actual Telegram group using Telegram API (pyrogram)
             group_title = f"🤝 {user_profile['name']} ↔ {target_profile['name']}"
+            group_description = f"Networking group for {user_profile['name']} ({user_profile['role']}) and {target_profile['name']} ({target_profile['role']})"
             
-            # Create a group using bot's sendMessage to create a "group-like" experience
-            # Since direct group creation has limitations, we'll create invite instructions
+            # Show progress
+            await query.edit_message_text("🏗️ **Creating your networking group...** ⏳")
             
-            group_instructions = f"🏗️ **Creating Your Networking Group**\n\n"
-            group_instructions += f"**Group Name:** {group_title}\n\n"
-            group_instructions += f"**Members:**\n"
-            group_instructions += f"• {user_profile['name']} - {user_profile['role']}\n"
-            group_instructions += f"• {target_profile['name']} - {target_profile['role']}\n\n"
-            
-            # Try to create an actual group using Telegram's group creation methods
-            try:
-                # Method 1: Generate a group creation deep link
-                # This is the most reliable approach for auto group creation
-                
-                # Create group creation URL - this opens Telegram's group creation dialog
-                bot_info = await context.bot.get_me()
-                bot_username = bot_info.username
-                
-                # Create a group creation link with pre-filled title
-                # Note: This opens Telegram's group creation dialog but doesn't auto-add users
-                # due to Telegram's privacy restrictions
-                group_creation_url = f"https://t.me/{bot_username}?startgroup={group_title.replace(' ', '+')}"
-                
-                # Create inline keyboard with group creation options
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🚀 Create Group Automatically", url=group_creation_url)],
-                    [InlineKeyboardButton("📋 Manual Setup Guide", callback_data=f"manual_setup_{target_user_id}")]
-                ])
-                
-                group_instructions += f"**🚀 Choose your group creation method:**\n\n"
-                group_instructions += f"**Option 1: Auto Group Creation**\n"
-                group_instructions += f"• Click 'Create Group Automatically'\n"
-                group_instructions += f"• Telegram will open group creation\n"
-                group_instructions += f"• Both users will be added automatically\n\n"
-                group_instructions += f"**Option 2: Manual Setup**\n"
-                group_instructions += f"• Click 'Manual Setup Guide' for instructions\n\n"
-                group_instructions += f"💡 **Tip:** Auto method is faster and easier!"
-                
-                await query.edit_message_text(group_instructions, reply_markup=keyboard)
-                
-                # Notify the target user about the group with a direct group creation link
-                try:
-                    target_keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🚀 Join Group Creation", url=group_creation_url)]
-                    ])
-                    
-                    await context.bot.send_message(
-                        chat_id=target_user_id,
-                        text=f"🏗️ **Group Invitation!**\n\n"
-                             f"**{user_profile['name']}** wants to create a networking group:\n"
-                             f"**{group_title}**\n\n"
-                             f"🚀 **Join the group creation:**\n"
-                             f"Click the button below to be automatically added to the group!\n\n"
-                             f"💡 **Or wait for the group invitation from {user_profile['name']}**",
-                        reply_markup=target_keyboard
-                    )
-                except Exception as notify_error:
-                    logger.error(f"Could not notify target user: {notify_error}")
-                
-            except Exception as api_error:
-                logger.error(f"Group creation API error: {api_error}")
-                
-                # Fallback to manual instructions
-                manual_keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📋 Show Manual Setup", callback_data=f"manual_setup_{target_user_id}")]
-                ])
-                
-                await query.edit_message_text(
-                    f"⚠️ **Auto-group creation needs manual setup**\n\n"
-                    f"**Group:** {group_title}\n\n"
-                    f"Click below for step-by-step instructions:",
-                    reply_markup=manual_keyboard
+            # Use the Telegram API client to create group
+            if telegram_api.is_initialized:
+                group_info = await telegram_api.create_group(
+                    group_title=group_title,
+                    user_ids=[target_user_id],
+                    description=group_description
                 )
                 
+                if group_info:
+                    # Success message with invite link
+                    success_message = f"🎉 **Group Created Successfully!**\n\n"
+                    success_message += f"**Group:** {group_info['group_title']}\n"
+                    success_message += f"**Members:** {group_info['member_count']}\n"
+                    success_message += f"**Invite Link:** {group_info['invite_link']}\n\n"
+                    success_message += f"**Instructions:**\n"
+                    success_message += f"1. Click the link above to join\n"
+                    success_message += f"2. {target_profile['name']} will receive their invite link\n"
+                    success_message += f"3. Start networking! 🚀\n\n"
+                    success_message += f"💡 **This group is private and secure**"
+                    
+                    await query.edit_message_text(success_message)
+                    
+                    # Send invite link to the target user
+                    try:
+                        await telegram_api.send_group_invite(
+                            user_id=target_user_id,
+                            group_info=group_info,
+                            sender_name=user_profile['name']
+                        )
+                        
+                    except Exception as notify_error:
+                        logger.error(f"Could not send invite to target user: {notify_error}")
+                        # Fallback: send via bot
+                        try:
+                            await context.bot.send_message(
+                                chat_id=target_user_id,
+                                text=f"🎉 **You've been invited to a networking group!**\n\n"
+                                     f"**Group:** {group_info['group_title']}\n"
+                                     f"**Created by:** {user_profile['name']} ({user_profile['role']})\n\n"
+                                     f"🔗 **Your Invite Link:** {group_info['invite_link']}\n\n"
+                                     f"Click the link to join and start networking! 🚀"
+                            )
+                        except Exception as bot_error:
+                            logger.error(f"Failed to send bot message to user {target_user_id}: {bot_error}")
+                    
+                    return  # Successfully created group, exit function
+                
+            # If we get here, group creation failed
+            raise Exception("Telegram API group creation failed")
+            
         except Exception as e:
             logger.error(f"Group creation failed: {e}")
-            await query.edit_message_text(
-                "❌ **Group creation failed**\n\n"
-                "You can create a group manually or use direct messages to network!"
-            )
+            
+            # Fallback to manual instructions if API fails
+            fallback_message = f"❌ **Auto group creation failed**\n\n"
+            fallback_message += f"Don't worry! Here are manual instructions:\n\n"
+            fallback_message += f"**Group Name:** {group_title}\n\n"
+            fallback_message += f"**Manual Setup:**\n"
+            fallback_message += f"1. Create new group in Telegram\n"
+            fallback_message += f"2. Add: {target_profile['name']}\n"
+            fallback_message += f"3. Set name: {group_title}\n"
+            fallback_message += f"4. Start networking! 🚀\n\n"
+            fallback_message += f"💡 **Alternative:** Use the buttons below"
+            
+            # Create inline keyboard with working alternatives
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📞 Share Contact Info", callback_data=f"share_contact_{target_user_id}")],
+                [InlineKeyboardButton("💬 Start Direct Chat", url=f"tg://user?id={target_user_id}")]
+            ])
+            
+            await query.edit_message_text(fallback_message, reply_markup=keyboard)
+        
     elif query.data.startswith("manual_setup_"):
-        # Handle manual setup instructions
+        # Handle manual setup instructions (kept as fallback)
         target_user_id = int(query.data.replace("manual_setup_", ""))
         user_id = query.from_user.id
         
@@ -516,6 +513,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         manual_instructions += f"💡 **Pro tip:** Both users will get notifications about this group!"
         
         await query.edit_message_text(manual_instructions)
+    elif query.data.startswith("share_contact_"):
+        # Handle contact sharing
+        target_user_id = int(query.data.replace("share_contact_", ""))
+        user_id = query.from_user.id
+        
+        user_profile = user_profiles[user_id]
+        target_profile = user_profiles[target_user_id]
+        
+        contact_info = f"📞 **Contact Information Exchange**\n\n"
+        contact_info += f"**Your Connection:**\n"
+        contact_info += f"👤 **Name:** {target_profile['name']}\n"
+        contact_info += f"🏢 **Role:** {target_profile['role']}\n"
+        contact_info += f"🚀 **Project:** {target_profile['project']}\n"
+        contact_info += f"💬 **Bio:** {target_profile['bio']}\n"
+        contact_info += f"🆔 **Telegram ID:** `{target_user_id}`\n\n"
+        contact_info += f"**To create a group:**\n"
+        contact_info += f"1. Start a new group in Telegram\n"
+        contact_info += f"2. Search for: {target_profile['name']}\n"
+        contact_info += f"3. Or forward this message to them\n"
+        contact_info += f"4. Add them to your group! 🚀"
+        
+        await query.edit_message_text(contact_info)
     else:
         # For any other callbacks, show instant connections message
         await query.edit_message_text(
@@ -543,7 +562,7 @@ async def list_connections(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(connection_list)
 
 async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Create a group with connections"""
+    """Create a group with connections using Telegram API"""
     user_id = update.effective_user.id
     
     if user_id not in user_connections or not user_connections[user_id]:
@@ -588,7 +607,7 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ User {target_id} profile not found.")
             return
     
-    # Create group name
+    # Create group name and description
     user_profile = user_profiles[user_id]
     all_users = [user_id] + target_user_ids
     group_members = []
@@ -602,8 +621,83 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(group_members) > 3:
         group_name += f" + {len(group_members) - 3} others"
     
-    # Provide instructions for manual group creation
-    instructions = f"📝 **Group Creation Instructions**\n\n"
+    # Create group description
+    group_description = f"EventCRM networking group created by {user_profile['name']}\n\n"
+    group_description += "Members:\n"
+    for uid in all_users:
+        if uid in user_profiles:
+            profile = user_profiles[uid]
+            group_description += f"• {profile['name']} - {profile['role']} at {profile['project']}\n"
+    
+    # Send processing message
+    processing_message = await update.message.reply_text(
+        "⏳ **Creating your group...**\n\n"
+        f"Group: {group_name}\n"
+        f"Members: {len(all_users)}\n\n"
+        "This may take a few seconds..."
+    )
+    
+    try:
+        # Attempt to create group using Telegram API
+        if telegram_api.is_initialized:
+            logger.info(f"Attempting to create group '{group_name}' with users: {target_user_ids}")
+            
+            group_info = await telegram_api.create_group(
+                group_title=group_name,
+                user_ids=target_user_ids,
+                description=group_description
+            )
+            
+            if group_info:
+                # Group created successfully!
+                success_message = f"🎉 **Group Created Successfully!**\n\n"
+                success_message += f"**Group:** {group_info['group_title']}\n"
+                success_message += f"**Members:** {group_info['member_count']}\n"
+                success_message += f"**Invite Link:** {group_info['invite_link']}\n\n"
+                success_message += f"✅ All members have been notified and can join using the link above!"
+                
+                await processing_message.edit_text(success_message)
+                
+                # Send invite links to all target users
+                for target_id in target_user_ids:
+                    try:
+                        await telegram_api.send_group_invite(
+                            user_id=target_id,
+                            group_info=group_info,
+                            sender_name=user_profile['name']
+                        )
+                        logger.info(f"Sent group invite to user {target_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to send invite to user {target_id}: {e}")
+                        # Fallback: send via bot
+                        try:
+                            await context.bot.send_message(
+                                chat_id=target_id,
+                                text=f"🎉 **Group Invitation**\n\n"
+                                     f"{user_profile['name']} created a group: **{group_info['group_title']}**\n\n"
+                                     f"🔗 **Join here:** {group_info['invite_link']}\n\n"
+                                     f"Click the link to join and start networking! 🚀"
+                            )
+                        except Exception as bot_e:
+                            logger.error(f"Failed to send bot message to user {target_id}: {bot_e}")
+                
+                return
+            else:
+                logger.warning("Telegram API group creation failed, falling back to manual instructions")
+        else:
+            logger.warning("Telegram API not initialized, falling back to manual instructions")
+    
+    except Exception as e:
+        logger.error(f"Error creating group with Telegram API: {e}")
+    
+    # Fallback to manual instructions
+    await processing_message.edit_text(
+        "⚠️ **Automatic group creation unavailable**\n\n"
+        "Providing manual setup instructions instead..."
+    )
+    
+    # Provide manual group creation instructions
+    instructions = f"📝 **Manual Group Creation Instructions**\n\n"
     instructions += f"**Suggested Group Name:** {group_name}\n\n"
     instructions += f"**To create the group manually:**\n"
     instructions += f"1. Create a new group in Telegram\n"
@@ -634,13 +728,37 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Failed to notify user {target_id}: {e}")
 
+async def initialize_app(application):
+    """Initialize the application and Telegram API client"""
+    # Initialize Telegram API client
+    logger.info("Initializing Telegram API client...")
+    api_success = await initialize_telegram_api()
+    if api_success:
+        logger.info("✅ Telegram API client initialized - Group creation available!")
+    else:
+        logger.warning("⚠️ Telegram API client failed to initialize - Using fallback mode")
+    
+    return api_success
+
+async def shutdown_app(application):
+    """Cleanup function"""
+    logger.info("Shutting down Telegram API client...")
+    await close_telegram_api()
+
 def main():
     """Main function"""
     token = os.getenv("TOKEN")
     if not token:
         raise ValueError("TOKEN environment variable not set")
     
-    app = ApplicationBuilder().token(token).build()
+    # Build application with hooks
+    app = (
+        ApplicationBuilder()
+        .token(token)
+        .post_init(initialize_app)
+        .post_shutdown(shutdown_app)
+        .build()
+    )
     
     # Add handlers
     app.add_handler(CommandHandler("start", start))
@@ -654,7 +772,10 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
     logger.info("Starting EventCRM Bot...")
-    app.run_polling()
+    try:
+        app.run_polling()
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
 
 if __name__ == "__main__":
     main()
