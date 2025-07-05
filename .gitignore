@@ -4,4 +4,5 @@ __pycache__/
 .cursorrules
 .pytest_cache/
 sessions*.orc
-rofl.yaml
+rofl.yaml*.orc
+/sessions
