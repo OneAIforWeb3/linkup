@@ -1,7 +1,7 @@
 services:
-  eventcrm-bot:
+  linkup-bot:
     build: .
-    image: "ghcr.io/oneaiforweb3/linkup-eventcrm:latest"
+    image: "ghcr.io/oneaiforweb3/linkup:latest"
     platform: linux/amd64
     ports:
       - "8000:8000"  # Flask API port
