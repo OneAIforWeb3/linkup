@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram API Client for EventCRM
+Telegram API Client for LinkUp
 Handles group creation using the full Telegram API (MTProto)
 """
 
@@ -20,7 +20,7 @@ class TelegramAPIClient:
     def __init__(self):
         self.app = None
         self.is_initialized = False
-        self.session_name = "eventcrm_session"
+        self.session_name = "linkup_session"
         
     async def initialize(self):
         """Initialize the Telegram API client"""
@@ -165,7 +165,7 @@ class TelegramAPIClient:
             
             return {
                 "id": user.id,
-                "first_name": user.first_name,
+                "full_name": f"{user.first_name} {user.last_name}".strip() if user.last_name else user.first_name,
                 "last_name": user.last_name,
                 "username": user.username,
                 "phone_number": user.phone_number,

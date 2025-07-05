@@ -22,7 +22,8 @@ def mock_update():
     update.message.reply_photo = AsyncMock()
     update.effective_user = Mock()
     update.effective_user.id = 12345
-    update.effective_user.first_name = "Test User"
+    update.effective_user.first_name = "Test"
+    update.effective_user.last_name = "User"
     return update
 
 @pytest.fixture
