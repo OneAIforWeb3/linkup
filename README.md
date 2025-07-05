@@ -75,8 +75,14 @@ EventCRM now supports **real Telegram group creation** using the full Telegram A
    TELEGRAM_API_HASH=your_api_hash  
    TELEGRAM_PHONE_NUMBER=+1234567890
    ```
-3. **Run the bot** and complete 2FA authentication on first start
-4. **Test group creation** with `/creategroup [user_id]`
+3. **Pre-authenticate your session** (recommended for production):
+   ```bash
+   python authenticate_session.py
+   ```
+4. **Run the bot** - it will use your pre-authenticated session
+5. **Test group creation** with `/creategroup [user_id]`
+
+⚠️ **Production Note**: For containerized/production environments, use pre-authentication to avoid 2FA issues.
 
 ### What's New
 
@@ -85,7 +91,9 @@ EventCRM now supports **real Telegram group creation** using the full Telegram A
 - ✅ **Smart Fallback**: Falls back to manual instructions if API unavailable
 - ✅ **Secure Sessions**: Session files stored securely for authentication
 
-📖 **Full Setup Guide**: See [TELEGRAM_API_SETUP.md](./TELEGRAM_API_SETUP.md) for detailed instructions
+📖 **Full Setup Guide**: See [TELEGRAM_API_SETUP.md](docs/TELEGRAM_API_SETUP.md) for detailed instructions
+
+🔐 **Authentication Guide**: See [TELEGRAM_API_AUTHENTICATION.md](docs/TELEGRAM_API_AUTHENTICATION.md) for handling 2FA in production
 
 ## ROFL Deployment
 

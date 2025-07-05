@@ -22,7 +22,7 @@ class TelegramAPIClient:
         self.is_initialized = False
         self.session_name = "linkup_session"
         
-    async def initialize(self):
+    async def initialize(self, interactive=False):
         """Initialize the Telegram API client"""
         api_id = os.getenv("TELEGRAM_API_ID")
         api_hash = os.getenv("TELEGRAM_API_HASH")
@@ -43,6 +43,16 @@ class TelegramAPIClient:
             
             # Create sessions directory if it doesn't exist
             os.makedirs("./sessions", exist_ok=True)
+            
+            # Check if session file exists
+            session_file = f"./sessions/{self.session_name}.session"
+            if os.path.exists(session_file):
+                logger.info("Using existing session file")
+            else:
+                logger.info("No session file found - will require authentication")
+                if not interactive:
+                    logger.error("Session file missing and not in interactive mode")
+                    return False
             
             await self.app.start()
             self.is_initialized = True
@@ -242,9 +252,9 @@ Click the link above to join the group and start networking! 🚀
 # Global instance
 telegram_api = TelegramAPIClient()
 
-async def initialize_telegram_api():
+async def initialize_telegram_api(interactive=False):
     """Initialize the global Telegram API client"""
-    return await telegram_api.initialize()
+    return await telegram_api.initialize(interactive=interactive)
 
 async def close_telegram_api():
     """Close the global Telegram API client"""
