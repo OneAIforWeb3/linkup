@@ -50,3 +50,10 @@ SELECT *
 FROM `groups` 
 WHERE group_id = %s
 """
+
+GET_USER_GROUPS_QUERY = """
+SELECT g.*, gp.user1_id, gp.user2_id
+FROM `groups` g
+JOIN group_participants gp ON g.group_id = gp.group_id
+WHERE gp.user1_id = %s OR gp.user2_id = %s
+"""

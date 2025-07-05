@@ -7,7 +7,7 @@ from mysql.connector import Error
 
 from constants import CHECK_USER_EXISTS_QUERY, INSERT_USER_QUERY, UPDATE_USER_QUERY, DELETE_USER_QUERY, \
     CREATE_GROUP_QUERY, INSERT_GROUP_PARTICIPANTS_QUERY, GET_GROUP_DETAILS_QUERY, GET_PARTICIPANT_QUERY, \
-    GET_USERS_DETAILS_QUERY
+    GET_USERS_DETAILS_QUERY, GET_USER_GROUPS_QUERY
 
 load_dotenv()
 
@@ -116,6 +116,46 @@ def delete_user(user_id):
         if cursor: cursor.close()
         if conn: conn.close()
 
+@app.route('/get-user-details', methods=['GET'])
+def get_user_details():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Missing user_id parameter'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = GET_USERS_DETAILS_QUERY.format(where_condition=f'WHERE user_id = {user_id}')
+        cursor.execute(query)
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify({'user': user}), 200
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route('/get-user-by-tg-id', methods=['GET'])
+def get_user_by_tg_id():
+    tg_id = request.args.get('tg_id')
+    if not tg_id:
+        return jsonify({'error': 'Missing tg_id parameter'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = GET_USERS_DETAILS_QUERY.format(where_condition=f'WHERE tg_id = {tg_id}')
+        cursor.execute(query)
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify({'user': user}), 200
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 @app.route('/create-group', methods=['POST'])
 def create_group():
@@ -135,7 +175,7 @@ def create_group():
             if not cursor.fetchone():
                 return jsonify({'error': f'User with user_id {uid} not found'}), 404
         # Create group
-        print(CREATE_GROUP_QUERY)
+        # print(CREATE_GROUP_QUERY)
         cursor.execute(CREATE_GROUP_QUERY, (
             data.get('group_link'),
             data.get('event_name'),
@@ -200,6 +240,50 @@ def group_details(group_id):
             cursor.execute(query, tuple(participant_ids))
             participants = cursor.fetchall()
         return jsonify({'group': group, 'participants': participants}), 200
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route('/get-user-groups', methods=['GET'])
+def get_user_groups():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Missing user_id parameter'}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(GET_USER_GROUPS_QUERY, (user_id, user_id))
+        groups = cursor.fetchall()
+        
+        # Process groups to include connection information
+        processed_groups = []
+        for group in groups:
+            # Determine the other user in the connection
+            other_user_id = group['user2_id'] if group['user1_id'] == int(user_id) else group['user1_id']
+            
+            # Get other user details
+            other_user_query = GET_USERS_DETAILS_QUERY.format(where_condition=f'WHERE user_id = {other_user_id}')
+            cursor.execute(other_user_query)
+            other_user = cursor.fetchone()
+            
+            processed_group = {
+                'group_id': group['group_id'],
+                'group_link': group['group_link'],
+                'event_name': group['event_name'],
+                'meeting_location': group['meeting_location'],
+                'meeting_time': group['meeting_time'],
+                'created_at': group['created_at'],
+                'updated_at': group['updated_at'],
+                'other_user_id': other_user_id,
+                'other_user': other_user
+            }
+            processed_groups.append(processed_group)
+        
+        return jsonify({'groups': processed_groups}), 200
     except Error as e:
         return jsonify({'error': str(e)}), 500
     finally:

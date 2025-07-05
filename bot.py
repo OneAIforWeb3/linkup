@@ -11,12 +11,14 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 from telegram_api import telegram_api, initialize_telegram_api, close_telegram_api
+from apis.api_client import api_client
 import qrcode
 import io
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import textwrap
 import random
 import math
+from typing import List, Dict
 
 load_dotenv()
 
@@ -460,11 +462,162 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# In-memory storage (in production, use encrypted database)
-user_profiles = {}
+# Database helper functions
+def db_user_to_profile(db_user):
+    """Convert database user format to bot profile format"""
+    if not db_user:
+        return None
+    
+    # Handle created_at field - could be string or datetime object
+    created_at_str = None
+    if db_user.get('created_at'):
+        created_at = db_user['created_at']
+        if hasattr(created_at, 'isoformat'):
+            created_at_str = created_at.isoformat()
+        else:
+            created_at_str = str(created_at)
+    
+    return {
+        'user_id': db_user['user_id'],
+        'name': db_user['display_name'] or 'Unknown',
+        'username': db_user['username'] or 'unknown',
+        'role': db_user['role'] or 'Not specified',
+        'project': db_user['project_name'] or 'Unknown Project',
+        'bio': db_user['description'] or 'LinkUp User',
+        'telegram_id': db_user['tg_id'],
+        'profile_image_url': db_user.get('profile_image_url'),
+        'created_at': created_at_str
+    }
+
+def profile_to_db_user(profile, tg_id):
+    """Convert bot profile format to database user format"""
+    return {
+        'tg_id': tg_id,
+        'username': profile.get('username'),
+        'display_name': profile.get('name'),
+        'project_name': profile.get('project'),
+        'role': profile.get('role'),
+        'description': profile.get('bio'),
+        'profile_image_url': profile.get('profile_image_url')
+    }
+
+async def get_user_profile(tg_id):
+    """Get user profile from database"""
+    try:
+        result = api_client.get_user_by_tg_id(tg_id)
+        if result and 'user' in result:
+            return db_user_to_profile(result['user'])
+        return None
+    except Exception as e:
+        logger.error(f"Error getting user profile from API: {e}")
+        return None
+
+async def create_or_update_user_profile(tg_id, profile_data):
+    """Create or update user profile in database"""
+    try:
+        # Check if user exists
+        existing_user = await get_user_profile(tg_id)
+        
+        if existing_user:
+            # Update existing user
+            user_id = existing_user['user_id']
+            update_data = profile_to_db_user(profile_data, tg_id)
+            # Remove tg_id from update data as it shouldn't be updated
+            update_data.pop('tg_id', None)
+            result = api_client.update_user(user_id, **update_data)
+            return result is not None
+        else:
+            # Create new user
+            create_data = profile_to_db_user(profile_data, tg_id)
+            result = api_client.create_user(**create_data)
+            return result is not None and 'user_id' in result
+    except Exception as e:
+        logger.error(f"Error creating/updating user profile in API: {e}")
+        return False
+
+# In-memory storage for temporary data (connections will be handled differently)
 connection_requests = {}
-user_connections = {}
 user_notes = {}
+
+async def get_user_connections(user_id: int) -> List[Dict]:
+    """Get user connections from database"""
+    try:
+        # Get user database ID first
+        user_profile = await get_user_profile(user_id)
+        if not user_profile:
+            return []
+        
+        db_user_id = user_profile['user_id']
+        result = api_client.get_user_groups(db_user_id)
+        
+        if result and 'groups' in result:
+            # Convert to connection format
+            connections = []
+            for group in result['groups']:
+                if group['other_user']:
+                    connection = {
+                        'user_id': group['other_user']['user_id'],
+                        'tg_id': group['other_user']['tg_id'],
+                        'name': group['other_user']['display_name'],
+                        'username': group['other_user']['username'],
+                        'role': group['other_user']['role'],
+                        'project': group['other_user']['project_name'],
+                        'bio': group['other_user']['description'],
+                        'group_id': group['group_id'],
+                        'group_link': group['group_link'],
+                        'event_name': group['event_name']
+                    }
+                    connections.append(connection)
+            return connections
+        
+        return []
+    except Exception as e:
+        logger.error(f"Error getting user connections from database: {e}")
+        return []
+
+async def create_connection_in_database(user_id: int, target_user_id: int, group_link: str = None, event_name: str = None) -> bool:
+    """Create a connection by storing a group in the database"""
+    try:
+        # Get user database IDs
+        user_profile = await get_user_profile(user_id)
+        target_profile = await get_user_profile(target_user_id)
+        
+        if not user_profile or not target_profile:
+            logger.error(f"Could not find profiles for users {user_id} and {target_user_id}")
+            return False
+        
+        db_user_id = user_profile['user_id']
+        db_target_user_id = target_profile['user_id']
+        
+        # Create group in database
+        result = api_client.create_group(
+            group_link=group_link or "https://t.me/linkup_temp",
+            user1_id=db_user_id,
+            user2_id=db_target_user_id,
+            event_name=event_name
+        )
+        
+        if result and 'group_id' in result:
+            logger.info(f"Created connection group {result['group_id']} between users {user_id} and {target_user_id}")
+            return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error creating connection in database: {e}")
+        return False
+
+async def check_connection_exists(user_id: int, target_user_id: int) -> bool:
+    """Check if connection exists between two users"""
+    try:
+        connections = await get_user_connections(user_id)
+        for connection in connections:
+            if connection['tg_id'] == target_user_id:
+                return True
+        return False
+    except Exception as e:
+        logger.error(f"Error checking connection existence: {e}")
+        return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Welcome message and handle deep link parameters"""
@@ -472,67 +625,86 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     # Handle deep link parameters (from QR code scan)
-    if context.args and context.args[0].startswith("user_"):
-        try:
-            target_user_id = int(context.args[0].replace("user_", ""))
-            
-            # Create basic profile if user doesn't have one
-            if user_id not in user_profiles:
-                username = update.effective_user.username or user_name.replace(' ', '').lower()
-                user_profiles[user_id] = {
-                    'name': user_name,
-                    'username': username,
-                    'role': 'Not specified',
-                    'project': f"{user_name}'s Project",
-                    'bio': 'LinkUp User',
-                    'telegram_id': user_id,
-                    'created_at': datetime.now().isoformat()
-                }
-            
-            # Get target user info (create basic profile if needed)
-            if target_user_id not in user_profiles:
-                try:
-                    target_user = await context.bot.get_chat(target_user_id)
-                    target_name = get_full_name(target_user)
-                    target_username = target_user.username or target_name.replace(' ', '').lower()
-                    user_profiles[target_user_id] = {
-                        'name': target_name,
-                        'username': target_username,
+    if context.args and len(context.args) > 0:
+        logger.info(f"Start command received with args: {context.args}")
+        
+        if context.args[0].startswith("user_"):
+            try:
+                target_user_id = int(context.args[0].replace("user_", ""))
+                logger.info(f"Processing QR scan: user {user_id} scanning user {target_user_id}")
+                
+                # Create basic profile if user doesn't have one
+                user_profile = await get_user_profile(user_id)
+                if not user_profile:
+                    username = update.effective_user.username or user_name.replace(' ', '').lower()
+                    basic_profile = {
+                        'name': user_name,
+                        'username': username,
                         'role': 'Not specified',
-                        'project': f"{target_name}'s Project",
-                        'bio': 'LinkUp User',
-                        'telegram_id': target_user_id,
-                        'created_at': datetime.now().isoformat()
+                        'project': f"{user_name}'s Project",
+                        'bio': 'LinkUp User'
                     }
-                except Exception as e:
-                    logger.error(f"Could not get target user info: {e}")
-                    await update.message.reply_text("❌ Could not connect with this user. Please try again.")
+                    success = await create_or_update_user_profile(user_id, basic_profile)
+                    if success:
+                        user_profile = await get_user_profile(user_id)
+                        logger.info(f"Created basic profile for scanning user {user_id}")
+                    else:
+                        logger.error(f"Failed to create basic profile for user {user_id}")
+                        await update.message.reply_text("❌ Failed to create your profile. Please try again.")
+                        return
+                
+                # Check if target user exists in profiles
+                target_profile = await get_user_profile(target_user_id)
+                if not target_profile:
+                    logger.warning(f"Target user {target_user_id} not found in profiles")
+                    await update.message.reply_text(
+                        "❌ **User Not Found**\n\n"
+                        "The person whose QR code you scanned hasn't set up their LinkUp profile yet.\n\n"
+                        "Please ask them to:\n"
+                        "1. Start the bot: /start\n"
+                        "2. Set up their profile: /profile\n"
+                        "3. Generate a new QR code: /myqr\n\n"
+                        "Then you can scan their QR code to connect!"
+                    )
                     return
-            
-            if target_user_id == user_id:
-                await update.message.reply_text("❌ You cannot connect with yourself!")
+                
+                if target_user_id == user_id:
+                    await update.message.reply_text("❌ You cannot connect with yourself!")
+                    return
+                
+                logger.info(f"Connecting {user_profile['name']} with {target_profile['name']}")
+                
+                # Check if already connected (using database instead of in-memory)
+                connection_exists = await check_connection_exists(user_id, target_user_id)
+                if connection_exists:
+                    await update.message.reply_text(
+                        f"✅ **Already Connected!**\n\n"
+                        f"You're already connected with {target_profile['name']}.\n"
+                        f"Use /myconnections to see all your connections.",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                # Show immediate group creation option
+                logger.info(f"Showing group creation option for users {user_id} and {target_user_id}")
+                await show_group_creation_option(update, context, user_id, target_user_id)
                 return
-            
-            # Get profiles
-            user_profile = user_profiles[user_id]
-            target_profile = user_profiles[target_user_id]
-            
-            # Check if already connected
-            if (user_id in user_connections and target_user_id in user_connections[user_id]):
+                
+            except (ValueError, IndexError) as e:
+                logger.error(f"Error processing QR scan parameter: {e}")
                 await update.message.reply_text(
-                    f"✅ **Already Connected!**\n\n"
-                    f"You're already connected with {target_profile['name']}.\n"
-                    f"Use /myconnections to see all your connections."
+                    "❌ **Invalid QR Code**\n\n"
+                    "The QR code you scanned doesn't seem to be a valid LinkUp QR code.\n\n"
+                    "Please make sure you're scanning a QR code generated by this bot."
                 )
                 return
-            
-            # Show immediate group creation option
-            await show_group_creation_option(update, context, user_id, target_user_id)
-            return
-            
-        except (ValueError, IndexError):
-            # Invalid parameter, continue with normal welcome
-            pass
+            except Exception as e:
+                logger.error(f"Unexpected error in QR scan processing: {e}")
+                await update.message.reply_text(
+                    "❌ **Error Processing QR Code**\n\n"
+                    "Something went wrong while processing the QR code. Please try again."
+                )
+                return
     
     # Normal welcome message with options
     keyboard = InlineKeyboardMarkup([
@@ -570,26 +742,32 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name, role, project, bio = parts
             user_id = update.effective_user.id
             
-            user_profiles[user_id] = {
+            profile_data = {
                 'name': name,
                 'username': update.effective_user.username or name.replace(' ', '').lower(),
                 'role': role,
                 'project': project,
-                'bio': bio,
-                'telegram_id': user_id,
-                'created_at': datetime.now().isoformat()
+                'bio': bio
             }
             
-            await update.message.reply_text(
-                f"✅ **Profile Updated!**\n\n"
-                f"👤 **Name:** {name}\n"
-                f"🏢 **Role:** {role}\n"
-                f"🚀 **Project:** {project}\n"
-                f"💬 **Bio:** {bio}\n\n"
-                f"Perfect! You can now generate QR codes and start networking.",
-                parse_mode='Markdown'
-            )
-            context.user_data['awaiting_profile'] = False
+            success = await create_or_update_user_profile(user_id, profile_data)
+            
+            if success:
+                await update.message.reply_text(
+                    f"✅ **Profile Updated!**\n\n"
+                    f"👤 **Name:** {name}\n"
+                    f"🏢 **Role:** {role}\n"
+                    f"🚀 **Project:** {project}\n"
+                    f"💬 **Bio:** {bio}\n\n"
+                    f"Perfect! You can now generate QR codes and start networking.",
+                    parse_mode='Markdown'
+                )
+                context.user_data['awaiting_profile'] = False
+            else:
+                await update.message.reply_text(
+                    "❌ **Failed to update profile**\n\n"
+                    "There was an error saving your profile. Please try again."
+                )
         else:
             await update.message.reply_text(
                 "❌ Invalid format. Please use:\n\n"
@@ -614,19 +792,22 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_full_name(update.effective_user)
     
     # Create basic profile if user doesn't have one
-    if user_id not in user_profiles:
+    profile = await get_user_profile(user_id)
+    if not profile:
         username = update.effective_user.username or user_name.replace(' ', '').lower()
-        user_profiles[user_id] = {
+        basic_profile = {
             'name': user_name,
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User',
-            'telegram_id': user_id,
-            'created_at': datetime.now().isoformat()
+            'bio': 'LinkUp User'
         }
-    
-    profile = user_profiles[user_id]
+        success = await create_or_update_user_profile(user_id, basic_profile)
+        if success:
+            profile = await get_user_profile(user_id)
+        else:
+            await update.message.reply_text("❌ Failed to create your profile. Please try again.")
+            return
     
     # Use Telegram deep link format that works with all QR scanners
     try:
@@ -692,19 +873,22 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_name = get_full_name(update.effective_user)
     
     # Create basic profile if user doesn't have one
-    if user_id not in user_profiles:
+    profile = await get_user_profile(user_id)
+    if not profile:
         username = update.effective_user.username or user_name.replace(' ', '').lower()
-        user_profiles[user_id] = {
+        basic_profile = {
             'name': user_name,
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User',
-            'telegram_id': user_id,
-            'created_at': datetime.now().isoformat()
+            'bio': 'LinkUp User'
         }
-    
-    profile = user_profiles[user_id]
+        success = await create_or_update_user_profile(user_id, basic_profile)
+        if success:
+            profile = await get_user_profile(user_id)
+        else:
+            await update.message.reply_text("❌ Failed to create your profile. Please try again.")
+            return
     
     # Parse command arguments
     event_name = None
@@ -832,7 +1016,8 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     
     # Check if target user exists
-    if target_user_id not in user_profiles:
+    target_profile = await get_user_profile(target_user_id)
+    if not target_profile:
         await update.message.reply_text("❌ User not found or hasn't set up profile")
         return
     
@@ -840,11 +1025,9 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ You cannot connect with yourself!")
         return
     
-    # Instant connection - no approval needed!
-    target_profile = user_profiles[target_user_id]
-    
     # Check if already connected
-    if (user_id in user_connections and target_user_id in user_connections[user_id]):
+    connection_exists = await check_connection_exists(user_id, target_user_id)
+    if connection_exists:
         await update.message.reply_text(
             f"✅ **Already Connected!**\n\n"
             f"You're already connected with {target_profile['name']}.\n"
@@ -857,17 +1040,19 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_group_creation_option(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_user_id: int):
     """Show immediate group creation option when users scan QR codes"""
-    user_profile = user_profiles[user_id]
-    target_profile = user_profiles[target_user_id]
+    user_profile = await get_user_profile(user_id)
+    target_profile = await get_user_profile(target_user_id)
     
-    # Create instant connection first
-    if user_id not in user_connections:
-        user_connections[user_id] = []
-    if target_user_id not in user_connections:
-        user_connections[target_user_id] = []
+    if not user_profile or not target_profile:
+        await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
+        return
     
-    user_connections[user_id].append(target_user_id)
-    user_connections[target_user_id].append(user_id)
+    # Create instant connection in database instead of in-memory
+    connection_created = await create_connection_in_database(user_id, target_user_id)
+    
+    if not connection_created:
+        await update.message.reply_text("❌ Failed to create connection. Please try again.")
+        return
     
     # Show group creation option
     keyboard = InlineKeyboardMarkup([
@@ -890,19 +1075,22 @@ async def generate_qr_from_callback(query, context):
     user_name = get_full_name(query.from_user)
     
     # Create basic profile if user doesn't have one
-    if user_id not in user_profiles:
+    profile = await get_user_profile(user_id)
+    if not profile:
         username = query.from_user.username or user_name.replace(' ', '').lower()
-        user_profiles[user_id] = {
+        basic_profile = {
             'name': user_name,
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User',
-            'telegram_id': user_id,
-            'created_at': datetime.now().isoformat()
+            'bio': 'LinkUp User'
         }
-    
-    profile = user_profiles[user_id]
+        success = await create_or_update_user_profile(user_id, basic_profile)
+        if success:
+            profile = await get_user_profile(user_id)
+        else:
+            await query.edit_message_text("❌ Failed to create your profile. Please try again.")
+            return
     
     # Get QR data
     try:
@@ -977,19 +1165,22 @@ async def generate_themed_qr_callback(query, context, theme):
     user_name = get_full_name(query.from_user)
     
     # Create basic profile if user doesn't have one
-    if user_id not in user_profiles:
+    profile = await get_user_profile(user_id)
+    if not profile:
         username = query.from_user.username or user_name.replace(' ', '').lower()
-        user_profiles[user_id] = {
+        basic_profile = {
             'name': user_name,
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User',
-            'telegram_id': user_id,
-            'created_at': datetime.now().isoformat()
+            'bio': 'LinkUp User'
         }
-    
-    profile = user_profiles[user_id]
+        success = await create_or_update_user_profile(user_id, basic_profile)
+        if success:
+            profile = await get_user_profile(user_id)
+        else:
+            await query.edit_message_text("❌ Failed to create your profile. Please try again.")
+            return
     
     # Get QR data
     try:
@@ -1057,8 +1248,12 @@ async def update_profile_from_callback(query, context):
 async def create_instant_group(query, context, target_user_id):
     """Create group immediately after QR scan"""
     user_id = query.from_user.id
-    user_profile = user_profiles[user_id]
-    target_profile = user_profiles[target_user_id]
+    user_profile = await get_user_profile(user_id)
+    target_profile = await get_user_profile(target_user_id)
+    
+    if not user_profile or not target_profile:
+        await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
+        return
     
     # Create group name: Project (UserA) <-> Project (UserB)
     group_title = f"{user_profile['project']} <-> {target_profile['project']}"
@@ -1076,12 +1271,23 @@ async def create_instant_group(query, context, target_user_id):
             )
             
             if group_info:
-                # Group created successfully - Send invite links via BOT
+                # Group created successfully - Store in database
+                connection_updated = await create_connection_in_database(
+                    user_id, target_user_id, 
+                    group_link=group_info['invite_link'],
+                    event_name="QR Code Connection"
+                )
+                
+                if connection_updated:
+                    logger.info(f"Stored instant group in database for users {user_id} and {target_user_id}")
+                
+                # Send response with group info
                 success_message = f"🎉 **Group Created Successfully!**\n\n"
                 success_message += f"**Group:** {group_info['group_title']}\n"
-                success_message += f"**Members:** {group_info['member_count']}\n\n"
+                success_message += f"**Members:** {group_info['member_count']}\n"
                 success_message += f"🔗 **Join your group:**\n{group_info['invite_link']}\n\n"
-                success_message += f"✅ {target_profile['name']} will receive their invite link from the bot!"
+                success_message += f"✅ {target_profile['name']} will receive their invite link from the bot!\n\n"
+                success_message += f"💾 **Connection saved to database.**"
                 
                 await query.edit_message_text(success_message)
                 
@@ -1097,7 +1303,8 @@ async def create_instant_group(query, context, target_user_id):
                              f"🏢 Role: {user_profile['role']}\n"
                              f"🚀 Project: {user_profile['project']}\n"
                              f"💬 Bio: {user_profile['bio']}\n\n"
-                             f"Click the link to join and start networking! 🚀"
+                             f"Click the link to join and start networking! 🚀\n\n"
+                             f"💾 **This connection is saved in your LinkUp profile.**"
                     )
                     logger.info(f"Bot sent group invite to user {target_user_id}")
                 except Exception as e:
@@ -1119,13 +1326,18 @@ async def create_instant_group(query, context, target_user_id):
         fallback_message += f"1. Create new group in Telegram\n"
         fallback_message += f"2. Add: {target_profile['name']}\n"
         fallback_message += f"3. Set name: {group_title}\n"
-        fallback_message += f"4. Start networking! 🚀"
+        fallback_message += f"4. Start networking! 🚀\n\n"
+        fallback_message += f"💾 **Your connection is still saved in the database.**"
         
         await query.edit_message_text(fallback_message)
 
 async def view_user_profile(query, context, target_user_id):
     """View user profile details"""
-    target_profile = user_profiles[target_user_id]
+    target_profile = await get_user_profile(target_user_id)
+    
+    if not target_profile:
+        await query.edit_message_text("❌ User profile not found.")
+        return
     
     profile_message = f"👤 **Profile: {target_profile['name']}**\n\n"
     profile_message += f"🏢 **Role:** {target_profile['role']}\n"
@@ -1139,34 +1351,29 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
     """Create instant connection and group between two users"""
     
     # Get profiles
-    user_profile = user_profiles[user_id]
-    target_profile = user_profiles[target_user_id]
+    user_profile = await get_user_profile(user_id)
+    target_profile = await get_user_profile(target_user_id)
     
-    # Add to connections
-    if user_id not in user_connections:
-        user_connections[user_id] = []
-    if target_user_id not in user_connections:
-        user_connections[target_user_id] = []
+    if not user_profile or not target_profile:
+        await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
+        return
     
-    user_connections[user_id].append(target_user_id)
-    user_connections[target_user_id].append(user_id)
+    # Create connection in database
+    connection_created = await create_connection_in_database(user_id, target_user_id, event_name="Direct Connection")
+    
+    if not connection_created:
+        await update.message.reply_text("❌ Failed to create connection. Please try again.")
+        return
     
     # Create group name
     group_name = f"{user_profile['name']} ↔ {target_profile['name']}"
     
     # Try to create actual Telegram group automatically
     try:
-        # Create actual Telegram group with both users
+        # Create group title
         group_title = f"{user_profile['name']} ↔ {target_profile['name']}"
         
-        # First create a group chat (Telegram requires special handling)
-        # We'll use the bot's ability to create group chats
-        group_chat = None
-        
         try:
-            # Method 1: Try to create a supergroup
-            # Note: This requires both users to have started the bot
-            
             # Create an invite link approach - more reliable
             invite_link_message = f"🎉 **Instant Connection + Auto Group!**\n\n"
             invite_link_message += f"**Connected with:** {target_profile['name']}\n"
@@ -1183,7 +1390,8 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
             ])
             
             invite_link_message += f"**🏗️ Ready to create your networking group!**\n"
-            invite_link_message += f"Click the button below to create a group chat."
+            invite_link_message += f"Click the button below to create a group chat.\n\n"
+            invite_link_message += f"💾 **Connection saved to database.**"
             
             await update.message.reply_text(invite_link_message, reply_markup=keyboard)
             
@@ -1200,7 +1408,8 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
             success_message += f"💡 **Next Steps:**\n"
             success_message += f"• You can now message each other directly\n"
             success_message += f"• Use /creategroup {target_user_id} to create a group\n"
-            success_message += f"• View all connections: /myconnections"
+            success_message += f"• View all connections: /myconnections\n\n"
+            success_message += f"💾 **Connection saved to database.**"
             
             await update.message.reply_text(success_message)
         
@@ -1211,7 +1420,8 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
             target_message += f"🏢 **Their Role:** {user_profile['role']}\n"
             target_message += f"🚀 **Their Project:** {user_profile['project']}\n"
             target_message += f"💬 **Their Bio:** {user_profile['bio']}\n\n"
-            target_message += f"💡 **Start networking!** Use /myconnections to see all your connections."
+            target_message += f"💡 **Start networking!** Use /myconnections to see all your connections.\n\n"
+            target_message += f"💾 **Connection saved to your LinkUp profile.**"
             
             await context.bot.send_message(
                 chat_id=target_user_id,
@@ -1223,11 +1433,12 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
         
     except Exception as e:
         logger.error(f"Failed to create group: {e}")
-        # Still create the connection, just without group
+        # Still created the connection in database, just inform user
         await update.message.reply_text(
             f"🎉 **Connection Created!**\n\n"
             f"You're now connected with **{target_profile['name']}**!\n"
-            f"Use /myconnections to see all your connections."
+            f"Use /myconnections to see all your connections.\n\n"
+            f"💾 **Connection saved to database.**"
         )
 
 async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1241,7 +1452,8 @@ async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         target_user_id = int(context.args[0])
         
-        if target_user_id not in user_profiles:
+        target_profile = await get_user_profile(target_user_id)
+        if not target_profile:
             await update.message.reply_text("❌ User not found")
             return
         
@@ -1250,8 +1462,8 @@ async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # Check if already connected
-        if (user_id in user_connections and target_user_id in user_connections[user_id]):
-            target_profile = user_profiles[target_user_id]
+        connection_exists = await check_connection_exists(user_id, target_user_id)
+        if connection_exists:
             await update.message.reply_text(
                 f"✅ **Already Connected!**\n\n"
                 f"You're already connected with {target_profile['name']}.\n"
@@ -1327,8 +1539,12 @@ Your personal networking assistant for events.
         target_user_id = int(query.data.replace("create_group_", ""))
         user_id = query.from_user.id
         
-        user_profile = user_profiles[user_id]
-        target_profile = user_profiles[target_user_id]
+        user_profile = await get_user_profile(user_id)
+        target_profile = await get_user_profile(target_user_id)
+        
+        if not user_profile or not target_profile:
+            await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
+            return
         
         try:
             # Create actual Telegram group using Telegram API (pyrogram)
@@ -1414,8 +1630,12 @@ Your personal networking assistant for events.
         target_user_id = int(query.data.replace("manual_setup_", ""))
         user_id = query.from_user.id
         
-        user_profile = user_profiles[user_id]
-        target_profile = user_profiles[target_user_id]
+        user_profile = await get_user_profile(user_id)
+        target_profile = await get_user_profile(target_user_id)
+        
+        if not user_profile or not target_profile:
+            await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
+            return
         group_title = f"🤝 {user_profile['name']} ↔ {target_profile['name']}"
         
         manual_instructions = f"📋 **Manual Group Setup Guide**\n\n"
@@ -1437,8 +1657,12 @@ Your personal networking assistant for events.
         target_user_id = int(query.data.replace("share_contact_", ""))
         user_id = query.from_user.id
         
-        user_profile = user_profiles[user_id]
-        target_profile = user_profiles[target_user_id]
+        user_profile = await get_user_profile(user_id)
+        target_profile = await get_user_profile(target_user_id)
+        
+        if not user_profile or not target_profile:
+            await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
+            return
         
         contact_info = f"📞 **Contact Information Exchange**\n\n"
         contact_info += f"**Your Connection:**\n"
@@ -1466,17 +1690,19 @@ async def list_connections(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List user connections"""
     user_id = update.effective_user.id
     
-    if user_id not in user_connections or not user_connections[user_id]:
+    # Get connections from database instead of in-memory storage
+    connections = await get_user_connections(user_id)
+    
+    if not connections:
         await update.message.reply_text("📭 No connections yet")
         return
     
-    connections = user_connections[user_id]
     connection_list = "🤝 Your Connections:\n\n"
     
-    for i, connection_id in enumerate(connections, 1):
-        if connection_id in user_profiles:
-            profile = user_profiles[connection_id]
-            connection_list += f"{i}. {profile['name']} - {profile['role']} - {profile['project']}\n"
+    for i, connection in enumerate(connections, 1):
+        connection_list += f"{i}. {connection['name']} - {connection['role']} - {connection['project']}\n"
+        if connection['event_name']:
+            connection_list += f"   📍 Event: {connection['event_name']}\n"
     
     await update.message.reply_text(connection_list)
 
@@ -1484,7 +1710,10 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Create a group with connections using Telegram API"""
     user_id = update.effective_user.id
     
-    if user_id not in user_connections or not user_connections[user_id]:
+    # Get connections from database instead of in-memory storage  
+    connections = await get_user_connections(user_id)
+    
+    if not connections:
         await update.message.reply_text(
             "📭 **No connections found!**\n\n"
             "You need to connect with someone first before creating a group.\n"
@@ -1494,47 +1723,50 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not context.args:
         # Show available connections
-        connections = user_connections[user_id]
         connection_list = "👥 **Create Group with Connections**\n\n"
         connection_list += "Available connections:\n"
         
-        for i, connection_id in enumerate(connections, 1):
-            if connection_id in user_profiles:
-                profile = user_profiles[connection_id]
-                connection_list += f"{i}. {profile['name']} (ID: {connection_id})\n"
+        for i, connection in enumerate(connections, 1):
+            connection_list += f"{i}. {connection['name']} (TG ID: {connection['tg_id']})\n"
         
-        connection_list += f"\n💡 **Usage:** `/creategroup [user_id1] [user_id2] ...`\n"
-        connection_list += f"**Example:** `/creategroup {connections[0] if connections else 'USER_ID'}`"
+        connection_list += f"\n💡 **Usage:** `/creategroup [tg_id1] [tg_id2] ...`\n"
+        connection_list += f"**Example:** `/creategroup {connections[0]['tg_id'] if connections else 'TG_ID'}`"
         
         await update.message.reply_text(connection_list)
         return
     
-    # Parse user IDs
+    # Parse user IDs (these are telegram IDs, not database IDs)
     try:
-        target_user_ids = [int(arg) for arg in context.args]
+        target_tg_ids = [int(arg) for arg in context.args]
     except ValueError:
         await update.message.reply_text("❌ Invalid user IDs. Please use numbers only.")
         return
     
     # Verify all users are connections
-    user_connections_list = user_connections.get(user_id, [])
-    for target_id in target_user_ids:
-        if target_id not in user_connections_list:
-            await update.message.reply_text(f"❌ User {target_id} is not in your connections.")
-            return
-        if target_id not in user_profiles:
-            await update.message.reply_text(f"❌ User {target_id} profile not found.")
+    connected_tg_ids = [connection['tg_id'] for connection in connections]
+    for target_tg_id in target_tg_ids:
+        if target_tg_id not in connected_tg_ids:
+            await update.message.reply_text(f"❌ User {target_tg_id} is not in your connections.")
             return
     
     # Create group name and description
-    user_profile = user_profiles[user_id]
-    all_users = [user_id] + target_user_ids
+    user_profile = await get_user_profile(user_id)
+    if not user_profile:
+        await update.message.reply_text("❌ Your profile not found. Please set up your profile first.")
+        return
+    
+    all_tg_ids = [user_id] + target_tg_ids
     group_members = []
     
-    for uid in all_users:
-        if uid in user_profiles:
-            profile = user_profiles[uid]
-            group_members.append(f"{profile['name']} ({profile['project']})")
+    # Add current user
+    group_members.append(f"{user_profile['name']} ({user_profile['project']})")
+    
+    # Add connected users
+    for target_tg_id in target_tg_ids:
+        for connection in connections:
+            if connection['tg_id'] == target_tg_id:
+                group_members.append(f"{connection['name']} ({connection['project']})")
+                break
     
     group_name = f"LinkUp: {' & '.join(group_members[:3])}"
     if len(group_members) > 3:
@@ -1543,62 +1775,75 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Create group description
     group_description = f"LinkUp networking group created by {user_profile['name']}\n\n"
     group_description += "Members:\n"
-    for uid in all_users:
-        if uid in user_profiles:
-            profile = user_profiles[uid]
-            group_description += f"• {profile['name']} - {profile['role']} at {profile['project']}\n"
+    group_description += f"• {user_profile['name']} - {user_profile['role']} at {user_profile['project']}\n"
+    for target_tg_id in target_tg_ids:
+        for connection in connections:
+            if connection['tg_id'] == target_tg_id:
+                group_description += f"• {connection['name']} - {connection['role']} at {connection['project']}\n"
+                break
     
     # Send processing message
     processing_message = await update.message.reply_text(
         "⏳ **Creating your group...**\n\n"
         f"Group: {group_name}\n"
-        f"Members: {len(all_users)}\n\n"
+        f"Members: {len(all_tg_ids)}\n\n"
         "This may take a few seconds..."
     )
     
     try:
         # Attempt to create group using Telegram API
         if telegram_api.is_initialized:
-            logger.info(f"Attempting to create group '{group_name}' with users: {target_user_ids}")
+            logger.info(f"Attempting to create group '{group_name}' with users: {target_tg_ids}")
             
             group_info = await telegram_api.create_group(
                 group_title=group_name,
-                user_ids=target_user_ids,
+                user_ids=target_tg_ids,
                 description=group_description
             )
             
             if group_info:
-                # Group created successfully!
+                # Group created successfully! Now store it in database
+                # Update existing connections with the new group link
+                for target_tg_id in target_tg_ids:
+                    connection_updated = await create_connection_in_database(
+                        user_id, target_tg_id, 
+                        group_link=group_info['invite_link'],
+                        event_name="Group Chat"
+                    )
+                    if connection_updated:
+                        logger.info(f"Updated connection with group link for users {user_id} and {target_tg_id}")
+                
                 success_message = f"🎉 **Group Created Successfully!**\n\n"
                 success_message += f"**Group:** {group_info['group_title']}\n"
                 success_message += f"**Members:** {group_info['member_count']}\n"
                 success_message += f"**Invite Link:** {group_info['invite_link']}\n\n"
-                success_message += f"✅ All members have been notified and can join using the link above!"
+                success_message += f"✅ All members have been notified and can join using the link above!\n\n"
+                success_message += f"💾 **Group saved to database for future reference.**"
                 
                 await processing_message.edit_text(success_message)
                 
                 # Send invite links to all target users
-                for target_id in target_user_ids:
+                for target_tg_id in target_tg_ids:
                     try:
                         await telegram_api.send_group_invite(
-                            user_id=target_id,
+                            user_id=target_tg_id,
                             group_info=group_info,
                             sender_name=user_profile['name']
                         )
-                        logger.info(f"Sent group invite to user {target_id}")
+                        logger.info(f"Sent group invite to user {target_tg_id}")
                     except Exception as e:
-                        logger.error(f"Failed to send invite to user {target_id}: {e}")
+                        logger.error(f"Failed to send invite to user {target_tg_id}: {e}")
                         # Fallback: send via bot
                         try:
                             await context.bot.send_message(
-                                chat_id=target_id,
+                                chat_id=target_tg_id,
                                 text=f"🎉 **Group Invitation**\n\n"
                                      f"{user_profile['name']} created a group: **{group_info['group_title']}**\n\n"
                                      f"🔗 **Join here:** {group_info['invite_link']}\n\n"
                                      f"Click the link to join and start networking! 🚀"
                             )
                         except Exception as bot_e:
-                            logger.error(f"Failed to send bot message to user {target_id}: {bot_e}")
+                            logger.error(f"Failed to send bot message to user {target_tg_id}: {bot_e}")
                 
                 return
             else:
@@ -1622,11 +1867,13 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     instructions += f"1. Create a new group in Telegram\n"
     instructions += f"2. Add these members:\n"
     
-    for uid in all_users:
-        if uid in user_profiles:
-            profile = user_profiles[uid]
-            username = profile.get('username', f'UserID: {uid}')
-            instructions += f"   • {profile['name']} (@{username})\n"
+    instructions += f"   • {user_profile['name']} (@{user_profile.get('username', f'UserID: {user_id}')})\n"
+    for target_tg_id in target_tg_ids:
+        for connection in connections:
+            if connection['tg_id'] == target_tg_id:
+                username = connection.get('username', f'UserID: {target_tg_id}')
+                instructions += f"   • {connection['name']} (@{username})\n"
+                break
     
     instructions += f"\n3. Set group name: {group_name}\n"
     instructions += f"4. Start networking! 🚀\n\n"
@@ -1635,17 +1882,17 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(instructions)
     
     # Notify all target users
-    for target_id in target_user_ids:
+    for target_tg_id in target_tg_ids:
         try:
             await context.bot.send_message(
-                chat_id=target_id,
+                chat_id=target_tg_id,
                 text=f"👥 **Group Invitation**\n\n"
                      f"{user_profile['name']} wants to create a group:\n"
                      f"**{group_name}**\n\n"
                      f"You'll receive group creation instructions from them!"
             )
         except Exception as e:
-            logger.error(f"Failed to notify user {target_id}: {e}")
+            logger.error(f"Failed to notify user {target_tg_id}: {e}")
 
 async def initialize_app(application):
     """Initialize the application and Telegram API client"""

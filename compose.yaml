@@ -1,8 +1,33 @@
 services:
   eventcrm-bot:
     build: .
-    image: "${IMAGE_NAME:-ghcr.io/your-username/eventcrm-bot}"
+    image: "ghcr.io/oneaiforweb3/linkup-eventcrm:latest"
     platform: linux/amd64
+    ports:
+      - "8000:8000"  # Flask API port
     environment:
+      # Telegram Bot Configuration
       - TOKEN=${TOKEN}
-    restart: unless-stopped 
+      
+      # Telegram API Configuration (for group creation)
+      - API_ID=${TELEGRAM_API_ID}
+      - API_HASH=${TELEGRAM_API_HASH}
+      - PHONE_NUMBER=${TELEGRAM_PHONE_NUMBER}
+      - BOT_SESSION_NAME=${BOT_SESSION_NAME:-linkup_bot}
+      
+      # Database Configuration
+      - MYSQL_HOST=${MYSQL_HOST:-localhost}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      
+      # API Configuration
+      - LINKUP_API_URL=${LINKUP_API_URL:-http://localhost:8000}
+      
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/get-user-details?user_id=1", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3 

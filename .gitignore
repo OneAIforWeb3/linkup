@@ -3,4 +3,5 @@ __pycache__/
 .DS_Store
 .cursorrules
 .pytest_cache/
-sessions
+sessions*.orc
+rofl.yaml
