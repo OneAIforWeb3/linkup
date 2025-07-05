@@ -37,35 +37,10 @@ def get_full_name(user):
 
 # QR Code Themes - Enhanced with more vibrant colors
 QR_THEMES = {
-    'blockchain': {
-        'bg_colors': [(147, 51, 234), (79, 70, 229)],  # Vibrant purple gradient
-        'pattern': 'tech',
-        'qr_colors': [(255, 255, 255), (240, 240, 240)]
-    },
-    'ethereum': {
-        'bg_colors': [(99, 102, 241), (139, 69, 19)],  # ETH indigo/brown
-        'pattern': 'crypto',
-        'qr_colors': [(255, 255, 255), (240, 248, 255)]
-    },
-    'ocean': {
-        'bg_colors': [(14, 165, 233), (6, 182, 212)],  # Vibrant ocean blue
-        'pattern': 'waves',
-        'qr_colors': [(255, 255, 255), (240, 255, 255)]
-    },
-    'sunset': {
-        'bg_colors': [(251, 146, 60), (239, 68, 68)],  # Vibrant orange/red sunset
-        'pattern': 'geometric',
-        'qr_colors': [(255, 255, 255), (255, 248, 240)]
-    },
-    'forest': {
-        'bg_colors': [(34, 197, 94), (21, 128, 61)],  # Vibrant green forest
-        'pattern': 'nature',
-        'qr_colors': [(255, 255, 255), (240, 255, 240)]
-    },
-    'minimal': {
-        'bg_colors': [(71, 85, 105), (148, 163, 184)],  # Modern gray gradient
-        'pattern': 'clean',
-        'qr_colors': [(255, 255, 255), (248, 248, 248)]
+    'ethcc': {
+        'bg_colors': [(0, 155, 208), (42, 206, 204)],  # ETHCC blue/teal
+        'pattern': 'ethcc',
+        'qr_colors': [(255, 255, 255), (255, 147, 91)]  # White and light orange
     }
 }
 
@@ -193,6 +168,41 @@ def add_enhanced_pattern_overlay(image, pattern_type, opacity=40):
                     draw.line([(x+size//2, y+size), (x+size//2, y+size+line_length)], 
                              fill=(255, 255, 255, opacity//2), width=2)
     
+    elif pattern_type == 'ethcc':
+        # ETHCC inspired pattern with triangular elements like the logo
+        for _ in range(25):
+            x = random.randint(0, width-70)
+            y = random.randint(0, height-70)
+            size = random.randint(30, 60)
+            
+            # Create triangular shapes inspired by ETHCC logo
+            if random.choice([True, False]):
+                # Upward pointing triangle (like top of logo)
+                points = [(x+size//2, y), (x+size, y+size), (x, y+size)]
+                draw.polygon(points, outline=(255, 255, 255, opacity), width=2)
+            else:
+                # Downward pointing triangle (like bottom of logo)
+                points = [(x, y), (x+size, y), (x+size//2, y+size)]
+                draw.polygon(points, outline=(255, 255, 255, opacity), width=2)
+                
+            # Add secondary shape for more complex pattern
+            x_offset = random.randint(-20, 20)
+            y_offset = random.randint(-20, 20)
+            smaller_size = size // 2
+            
+            if random.choice([True, False, False]):  # Less frequently
+                # Add hexagon shape (inspired by Ethereum)
+                hex_size = smaller_size
+                hex_points = [
+                    (x+x_offset+hex_size//2, y+y_offset),
+                    (x+x_offset+hex_size, y+y_offset+hex_size//4),
+                    (x+x_offset+hex_size, y+y_offset+3*hex_size//4),
+                    (x+x_offset+hex_size//2, y+y_offset+hex_size),
+                    (x+x_offset, y+y_offset+3*hex_size//4),
+                    (x+x_offset, y+y_offset+hex_size//4)
+                ]
+                draw.polygon(hex_points, outline=(255, 255, 255, opacity//2), width=1)
+    
     elif pattern_type == 'crypto':
         # Enhanced crypto patterns with diamond crystals
         for _ in range(20):
@@ -286,7 +296,73 @@ def add_decorative_elements(draw, size, theme_config):
     
     for i, (x, y) in enumerate(corners):
         # Create different corner styles based on theme
-        if theme_config.get('pattern') in ['tech', 'crypto']:
+        if theme_config.get('pattern') == 'ethcc':
+            # ETHCC style corners with triangular elements
+            if i == 0:  # Top-left
+                # Create a triangular corner decoration
+                triangle_points = [
+                    (x, y),
+                    (x + corner_size, y),
+                    (x, y + corner_size)
+                ]
+                draw.polygon(triangle_points, outline=(255, 255, 255, 200), width=line_width)
+                # Inner detail
+                smaller_size = corner_size // 2
+                smaller_triangle = [
+                    (x + 4, y + 4),
+                    (x + smaller_size, y + 4),
+                    (x + 4, y + smaller_size)
+                ]
+                draw.polygon(smaller_triangle, outline=(255, 255, 255, 150), width=line_width//2)
+            elif i == 1:  # Top-right
+                # Create a triangular corner decoration
+                triangle_points = [
+                    (x + corner_size, y),
+                    (x + corner_size, y + corner_size),
+                    (x, y)
+                ]
+                draw.polygon(triangle_points, outline=(255, 255, 255, 200), width=line_width)
+                # Inner detail
+                smaller_size = corner_size // 2
+                smaller_triangle = [
+                    (x + corner_size - 4, y + 4),
+                    (x + corner_size - 4, y + smaller_size),
+                    (x + corner_size - smaller_size, y + 4)
+                ]
+                draw.polygon(smaller_triangle, outline=(255, 255, 255, 150), width=line_width//2)
+            elif i == 2:  # Bottom-left
+                # Create a triangular corner decoration
+                triangle_points = [
+                    (x, y + corner_size),
+                    (x + corner_size, y + corner_size),
+                    (x, y)
+                ]
+                draw.polygon(triangle_points, outline=(255, 255, 255, 200), width=line_width)
+                # Inner detail
+                smaller_size = corner_size // 2
+                smaller_triangle = [
+                    (x + 4, y + corner_size - 4),
+                    (x + smaller_size, y + corner_size - 4),
+                    (x + 4, y + corner_size - smaller_size)
+                ]
+                draw.polygon(smaller_triangle, outline=(255, 255, 255, 150), width=line_width//2)
+            else:  # Bottom-right
+                # Create a triangular corner decoration
+                triangle_points = [
+                    (x + corner_size, y),
+                    (x + corner_size, y + corner_size),
+                    (x, y + corner_size)
+                ]
+                draw.polygon(triangle_points, outline=(255, 255, 255, 200), width=line_width)
+                # Inner detail
+                smaller_size = corner_size // 2
+                smaller_triangle = [
+                    (x + corner_size - 4, y + corner_size - 4),
+                    (x + corner_size - 4, y + corner_size - smaller_size),
+                    (x + corner_size - smaller_size, y + corner_size - 4)
+                ]
+                draw.polygon(smaller_triangle, outline=(255, 255, 255, 150), width=line_width//2)
+        elif theme_config.get('pattern') in ['tech', 'crypto']:
             # Tech/crypto: Square corners with inner details
             draw.rectangle([x, y, x + corner_size, y + corner_size], 
                          outline=(255, 255, 255, 200), width=line_width)
@@ -305,17 +381,39 @@ def add_decorative_elements(draw, size, theme_config):
                          x + corner_size - inner_margin, y + corner_size - inner_margin], 
                         outline=(255, 255, 255, 150), width=line_width//2)
     
-    # Add subtle border frame
+    # Add subtle border frame - customized by theme
     frame_margin = int(size * 0.01)
-    draw.rectangle([frame_margin, frame_margin, size - frame_margin, size - frame_margin], 
-                  outline=(255, 255, 255, 100), width=2)
+    if theme_config.get('pattern') == 'ethcc':
+        # For ETHCC, add a border frame with triangular corners
+        # Draw border lines
+        line_width = 3
+        # Top line
+        draw.line([(frame_margin + corner_size, frame_margin), 
+                  (size - frame_margin - corner_size, frame_margin)], 
+                 fill=(255, 255, 255, 100), width=line_width)
+        # Right line
+        draw.line([(size - frame_margin, frame_margin + corner_size), 
+                  (size - frame_margin, size - frame_margin - corner_size)], 
+                 fill=(255, 255, 255, 100), width=line_width)
+        # Bottom line
+        draw.line([(frame_margin + corner_size, size - frame_margin), 
+                  (size - frame_margin - corner_size, size - frame_margin)], 
+                 fill=(255, 255, 255, 100), width=line_width)
+        # Left line
+        draw.line([(frame_margin, frame_margin + corner_size), 
+                  (frame_margin, size - frame_margin - corner_size)], 
+                 fill=(255, 255, 255, 100), width=line_width)
+    else:
+        # Standard border for other themes
+        draw.rectangle([frame_margin, frame_margin, size - frame_margin, size - frame_margin], 
+                      outline=(255, 255, 255, 100), width=2)
 
-def create_themed_qr(qr_data, username, event_name=None, theme='blockchain', size=1000):
+def create_themed_qr(qr_data, username, event_name=None, theme='ethcc', size=1000):
     """Create a themed QR code with username and optional event name"""
     try:
         
         # Get theme configuration
-        theme_config = QR_THEMES.get(theme, QR_THEMES['blockchain'])
+        theme_config = QR_THEMES.get(theme, QR_THEMES['ethcc'])
         
         # Create QR code
         qr = qrcode.QRCode(
@@ -348,9 +446,9 @@ def create_themed_qr(qr_data, username, event_name=None, theme='blockchain', siz
         
         # Dynamic positioning based on whether event name exists
         if event_name:
-            qr_y = int(size * 0.4)  # Lower position when event name exists
+            qr_y = int(size * 0.35)  # Lower position when event name exists
         else:
-            qr_y = int(size * 0.35)  # Higher position when no event name
+            qr_y = int(size * 0.28)  # Higher position when no event name, moved up to make room for username below
         
         # Resize and paste QR code
         qr_resized = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
@@ -388,16 +486,16 @@ def create_themed_qr(qr_data, username, event_name=None, theme='blockchain', siz
                 "arial.ttf",  # Windows
             ]
             
-            # Different font sizes for better hierarchy
+            # INCREASED FONT SIZES for better visibility
             title_font = None
             username_font = None
             event_font = None
             
             for font_path in font_paths:
                 try:
-                    title_font = ImageFont.truetype(font_path, 72)  # Larger for title
-                    username_font = ImageFont.truetype(font_path, 56)  # Medium for username
-                    event_font = ImageFont.truetype(font_path, 48)  # Smaller for event
+                    title_font = ImageFont.truetype(font_path, 85)  # Larger for title
+                    username_font = ImageFont.truetype(font_path, 72)  # INCREASED for username
+                    event_font = ImageFont.truetype(font_path, 60)  # Larger for event
                     break
                 except (OSError, IOError):
                     continue
@@ -430,31 +528,83 @@ def create_themed_qr(qr_data, username, event_name=None, theme='blockchain', siz
             # Main event text with gradient effect simulation
             draw.text((event_x, event_y), event_text, fill=(255, 255, 255, 255), font=event_font)
         
-        # Add username at bottom with improved spacing
+        # Add username BELOW the QR code with improved visibility
         username_text = f"@{username}" if not username.startswith('@') else username
         
         bbox = draw.textbbox((0, 0), username_text, font=username_font)
         username_width = bbox[2] - bbox[0]
         username_x = (size - username_width) // 2
-        username_y = int(size * 0.85)  # Bottom positioning with percentage
         
-        # Enhanced username text shadow
+        # Position username directly below the QR code
+        username_y = qr_y + qr_bg_size + 20  # 20px padding between QR and username
+        
+        # Enhanced username text shadow for better readability
         for offset in range(4, 0, -1):
-            shadow_alpha = int(150 * offset / 4)
+            shadow_alpha = int(160 * offset / 4)  # Increased shadow opacity
             draw.text((username_x + offset, username_y + offset), username_text, 
                      fill=(0, 0, 0, shadow_alpha), font=username_font)
         
         # Main username text
         draw.text((username_x, username_y), username_text, fill=(255, 255, 255, 255), font=username_font)
         
-        # Add enhanced decorative elements
+        # Add decorative elements
         add_decorative_elements(draw, size, theme_config)
         
-        # Convert back to RGB
+        # Add ETHCC logo in top right corner if theme is 'ethcc'
+        if theme == 'ethcc':
+            # Define the logo size - make it prominent but not overwhelming
+            logo_size = int(size * 0.2)  # 20% of the canvas width
+            
+            # Create a simplified ETHCC logo using triangular shapes
+            # Top triangle (blue)
+            logo_x = int(size * 0.75)  # Position in top right area
+            logo_y = int(size * 0.1)  # Position in top right area
+            
+            # Triangle dimensions
+            triangle_height = int(logo_size * 0.8)
+            triangle_width = int(logo_size * 0.8)
+            
+            # Draw the triangular logo inspired by ETHCC
+            # Top triangle (blue)
+            top_triangle = [
+                (logo_x + triangle_width//2, logo_y),
+                (logo_x + triangle_width, logo_y + triangle_height),
+                (logo_x, logo_y + triangle_height)
+            ]
+            draw.polygon(top_triangle, fill=(0, 155, 208, 220))  # ETHCC blue
+            
+            # Bottom triangle (teal)
+            bottom_triangle = [
+                (logo_x, logo_y + triangle_height - triangle_height//3),
+                (logo_x + triangle_width, logo_y + triangle_height - triangle_height//3),
+                (logo_x + triangle_width//2, logo_y + triangle_height*2 - triangle_height//3)
+            ]
+            draw.polygon(bottom_triangle, fill=(42, 206, 204, 220))  # ETHCC teal
+            
+            # Add logo outline for better visibility
+            draw.line(top_triangle + [top_triangle[0]], fill=(255, 255, 255, 180), width=3)
+            draw.line(bottom_triangle + [bottom_triangle[0]], fill=(255, 255, 255, 180), width=3)
+            
+            # Add "ETHCC" text below logo if space allows
+            if not event_name:
+                ethcc_text = "ETHCC"
+                ethcc_font = username_font
+                bbox = draw.textbbox((0, 0), ethcc_text, font=ethcc_font)
+                ethcc_width = bbox[2] - bbox[0]
+                ethcc_x = logo_x + triangle_width//2 - ethcc_width//2
+                ethcc_y = logo_y + triangle_height*2 + 10
+                
+                # Draw ETHCC text with shadow
+                for offset in range(3, 0, -1):
+                    shadow_alpha = int(100 * offset / 3)
+                    draw.text((ethcc_x + offset, ethcc_y + offset), ethcc_text, 
+                             fill=(0, 0, 0, shadow_alpha), font=ethcc_font)
+                draw.text((ethcc_x, ethcc_y), ethcc_text, fill=(255, 255, 255, 220), font=ethcc_font)
+            
+        # Convert back to RGB for saving
         canvas = canvas.convert('RGB')
         
         return canvas
-        
     except Exception as e:
         logger.error(f"Error creating themed QR code: {e}")
         return None
@@ -768,11 +918,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
     
-    # Normal welcome message with options
+    # Normal welcome message with enhanced options
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📱 Basic QR Code", callback_data="generate_qr")],
-        [InlineKeyboardButton("🎨 Themed QR Code", callback_data="themed_qr_menu")],
-        [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile")]
+        [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
+         InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
+        [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
+         InlineKeyboardButton("👥 My Connections", callback_data="view_connections")]
     ])
     
     welcome_text = f"""
@@ -780,9 +931,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Your personal networking assistant for events.
 
-**Quick Actions:**
+**Available Commands:**
+
+📋 **Profile Management**:
+• /profile - Set up or update your profile
+• /myqr - Generate a basic QR code to share
+• /themedqr - Create a stylish themed QR code
+
+👥 **Networking**:
+• /myconnections - View all your connections
+• /creategroup - Create a group chat with your connections
+• /scan - Scan a QR code from image (reply to an image)
+• /connect [user_id] - Connect with a user by ID
+
+📱 **Quick Actions:**
+Use the buttons below for fast access to common features!
     """
-    await update.message.reply_text(welcome_text, reply_markup=keyboard)
+    await update.message.reply_text(welcome_text, reply_markup=keyboard, parse_mode='Markdown')
 
 async def setup_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Profile setup"""
@@ -842,10 +1007,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle other text messages
         await update.message.reply_text(
             "👋 Hi! Use /start to see available options, or try:\n\n"
-            "📱 /myqr - Generate your QR code\n"
-            "✏️ /profile - Update your profile\n"
-            "🔍 /scan - Scan someone's QR code\n"
-            "👥 /myconnections - View your connections"
+            "📋 **Profile Management**:\n"
+            "• /profile - Set up or update your profile\n"
+            "• /myqr - Generate a basic QR code to share\n"
+            "• /themedqr - Create a stylish themed QR code\n\n"
+            "👥 **Networking**:\n"
+            "• /myconnections - View all your connections\n"
+            "• /creategroup - Create a group chat with your connections\n"
+            "• /scan - Scan a QR code from image (reply to an image)\n"
+            "• /connect [user_id] - Connect with a user by ID",
+            parse_mode='Markdown'
         )
 
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -881,41 +1052,57 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Fallback to user ID only
         qr_data = f"LinkUp://user/{user_id}"
     
-    # Generate QR code image
-    import qrcode
-    import io
-    from PIL import Image
-    
     try:
-        # Create QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
+        # Use the card-style QR code generator
+        username = profile.get('username', user_name.replace(' ', '').lower())
+        card_qr = create_card_style_qr(qr_data, username)
         
-        # Create QR code image
-        qr_image = qr.make_image(fill_color="black", back_color="white")
-        
-        # Convert to bytes
-        bio = io.BytesIO()
-        qr_image.save(bio, format='PNG')
-        bio.seek(0)
-        
-        # Send QR code image
-        await update.message.reply_photo(
-            photo=bio,
-            caption=f"📱 **Your QR Code**\n\n"
-                   f"👤 **Your Profile:**\n"
-                   f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-                   f"{profile['bio']}\n\n"
-                   f"💡 **Want a themed QR?** Try `/themedqr event:ETHCC theme:ethereum`\n\n"
-                   f"**Available themes:** blockchain, ethereum, ocean, sunset, forest, minimal",
-            parse_mode='Markdown'
-        )
+        if card_qr:
+            bio = io.BytesIO()
+            card_qr.save(bio, format='PNG', quality=95)
+            bio.seek(0)
+            
+            caption = f"📱 **Your ETHCC QR Card**\n\n"
+            caption += f"👤 **Your Profile:**\n"
+            caption += f"{profile['name']} | {profile['role']} | {profile['project']}\n"
+            caption += f"{profile['bio']}\n\n"
+            caption += f"💡 **Tip:** Show this QR card at events to connect with others!"
+            
+            await update.message.reply_photo(
+                photo=bio,
+                caption=caption,
+                parse_mode='Markdown'
+            )
+        else:
+            # Fallback to simple QR if card generation fails
+            # Create QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            
+            # Create QR code image
+            qr_image = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to bytes
+            bio = io.BytesIO()
+            qr_image.save(bio, format='PNG')
+            bio.seek(0)
+            
+            # Send QR code image
+            await update.message.reply_photo(
+                photo=bio,
+                caption=f"📱 **Your QR Code**\n\n"
+                       f"👤 **Your Profile:**\n"
+                       f"{profile['name']} | {profile['role']} | {profile['project']}\n"
+                       f"{profile['bio']}\n\n"
+                       f"💡 **Want a better QR?** Try `/themedqr` for our stylish ETHCC card!",
+                parse_mode='Markdown'
+            )
         
     except Exception as e:
         logger.error(f"QR code generation failed: {e}")
@@ -969,7 +1156,7 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(
             f"❌ **Invalid theme:** `{theme}`\n\n"
             f"**Available themes:** {available_themes}\n\n"
-            f"**Example:** `/themedqr event:ETHCC theme:ethereum`",
+            f"**Example:** `/themedqr event:ETHCC theme:ethcc`",
             parse_mode='Markdown'
         )
         return
@@ -986,8 +1173,7 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Generate username for QR
     username = profile.get('username', profile['name'].replace(' ', '').lower())
     
-    # Send "generating" message
-    generating_msg = await update.message.reply_text("🎨 **Creating your themed QR code...** ⏳")
+    await update.message.reply_text("🎨 **Creating your themed QR code...** ⏳")
     
     try:
         # Create themed QR
@@ -1007,9 +1193,9 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
             caption += f"🚀 **Project:** {profile['project']}\n\n"
             caption += f"💡 **Show this personalized QR code at events to stand out!**\n\n"
             caption += f"**Try other themes:**\n"
+            caption += f"• `/themedqr theme:ethcc` - ETHCC official\n"
             caption += f"• `/themedqr theme:ethereum` - Crypto style\n"
-            caption += f"• `/themedqr theme:ocean` - Ocean vibes\n"
-            caption += f"• `/themedqr theme:sunset` - Warm colors"
+            caption += f"• `/themedqr theme:ocean` - Ocean vibes"
             
             await update.message.reply_photo(
                 photo=bio,
@@ -1018,17 +1204,17 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             
             # Delete the generating message
-            await generating_msg.delete()
+            await update.message.delete()
         else:
             # Fallback if themed QR creation fails
-            await generating_msg.edit_text(
+            await update.message.reply_text(
                 "❌ **Themed QR creation failed**\n\n"
                 "Use `/myqr` for a basic QR code instead."
             )
             
     except Exception as e:
         logger.error(f"Themed QR code generation failed: {e}")
-        await generating_msg.edit_text(
+        await update.message.reply_text(
             "❌ **Themed QR creation failed**\n\n"
             f"Error: {str(e)}\n\n"
             "Use `/myqr` for a basic QR code instead."
@@ -1286,461 +1472,377 @@ async def generate_qr_from_callback(query, context):
         qr_data = f"https://t.me/{bot_username}?start=user_{user_id}"
     except Exception as e:
         logger.error(f"Could not get bot username: {e}")
+        # Fallback to user ID only
         qr_data = f"LinkUp://user/{user_id}"
     
-    # Generate QR code image
-    import qrcode
-    import io
+    # Show "generating" message
+    await query.edit_message_text("�� **Creating your QR card...** ⏳")
     
     try:
-        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-        qr.add_data(qr_data)
-        qr.make(fit=True)
+        # Use the card-style QR code generator
+        username = profile.get('username', user_name.replace(' ', '').lower())
+        card_qr = create_card_style_qr(qr_data, username)
         
-        qr_image = qr.make_image(fill_color="black", back_color="white")
-        bio = io.BytesIO()
-        qr_image.save(bio, format='PNG')
-        bio.seek(0)
-        
-        # Send QR code image
-        await context.bot.send_photo(
-            chat_id=query.from_user.id,
-            photo=bio,
-            caption=f"📱 **Your QR Code**\n\n"
-                   f"👤 **Your Profile:**\n"
-                   f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-                   f"{profile['bio']}\n\n"
-                   f"💡 **Share this QR code with other attendees to instantly create groups!**",
-            parse_mode='Markdown'
-        )
-        
-        await query.edit_message_text("✅ **QR Code sent!** Share it with other attendees to connect instantly.")
-        
-    except Exception as e:
-        logger.error(f"QR code generation failed: {e}")
-        await query.edit_message_text(f"📱 Your QR Code: `{qr_data}`\n\nShare this with other attendees!", parse_mode='Markdown')
-
-async def show_themed_qr_menu(query, context):
-    """Show themed QR code menu"""
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔷 Blockchain", callback_data="themed_qr_blockchain"),
-         InlineKeyboardButton("💎 Ethereum", callback_data="themed_qr_ethereum")],
-        [InlineKeyboardButton("🌊 Ocean", callback_data="themed_qr_ocean"),
-         InlineKeyboardButton("🌅 Sunset", callback_data="themed_qr_sunset")],
-        [InlineKeyboardButton("🌲 Forest", callback_data="themed_qr_forest"),
-         InlineKeyboardButton("⚪ Minimal", callback_data="themed_qr_minimal")],
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data="back_to_start")]
-    ])
-    
-    await query.edit_message_text(
-        "🎨 **Choose Your QR Theme**\n\n"
-        "Select a theme for your personalized QR code:\n\n"
-        "🔷 **Blockchain** - Purple tech vibes\n"
-        "💎 **Ethereum** - Crypto blue/purple\n"
-        "🌊 **Ocean** - Turquoise waves\n"
-        "🌅 **Sunset** - Warm orange/red\n"
-        "🌲 **Forest** - Natural green\n"
-        "⚪ **Minimal** - Clean gray\n\n"
-        "💡 **Tip:** Use `/themedqr event:EVENTNAME theme:THEME` for event-specific QR codes!",
-        reply_markup=keyboard,
-        parse_mode='Markdown'
-    )
-
-async def generate_themed_qr_callback(query, context, theme):
-    """Generate themed QR from callback"""
-    user_id = query.from_user.id
-    user_name = get_full_name(query.from_user)
-    
-    # Create basic profile if user doesn't have one
-    profile = await get_user_profile(user_id)
-    if not profile:
-        username = query.from_user.username or user_name.replace(' ', '').lower()
-        basic_profile = {
-            'name': user_name,
-            'username': username,
-            'role': 'Not specified',
-            'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User'
-        }
-        success = await create_or_update_user_profile(user_id, basic_profile)
-        if success:
-            profile = await get_user_profile(user_id)
-        else:
-            await query.edit_message_text("❌ Failed to create your profile. Please try again.")
-            return
-    
-    # Get QR data
-    try:
-        bot_info = await context.bot.get_me()
-        bot_username = bot_info.username
-        qr_data = f"https://t.me/{bot_username}?start=user_{user_id}"
-    except Exception as e:
-        logger.error(f"Could not get bot username: {e}")
-        qr_data = f"LinkUp://user/{user_id}"
-    
-    # Generate username for QR
-    username = profile.get('username', profile['name'].replace(' ', '').lower())
-    
-    await query.edit_message_text("🎨 **Creating your themed QR code...** ⏳")
-    
-    try:
-        # Create themed QR
-        themed_qr = create_themed_qr(qr_data, username, None, theme)
-        
-        if themed_qr:
+        if card_qr:
             bio = io.BytesIO()
-            themed_qr.save(bio, format='PNG', quality=95)
+            card_qr.save(bio, format='PNG', quality=95)
             bio.seek(0)
             
-            caption = f"🎨 **Your {theme.title()} QR Code**\n\n"
-            caption += f"👤 **Profile:** {profile['name']}\n"
-            caption += f"🏢 **Role:** {profile['role']}\n"
-            caption += f"🚀 **Project:** {profile['project']}\n\n"
-            caption += f"💡 **Share this personalized QR code at events!**\n\n"
-            caption += f"**Want event-specific QR?**\n"
-            caption += f"Use: `/themedqr event:ETHCC theme:{theme}`"
+            caption = f"📱 **Your ETHCC QR Card**\n\n"
+            caption += f"👤 **Your Profile:**\n"
+            caption += f"{profile['name']} | {profile['role']} | {profile['project']}\n"
+            caption += f"{profile['bio']}\n\n"
+            caption += f"💡 **Tip:** Show this QR card at events to connect with others!"
             
+            # Send as new message to preserve quality
             await context.bot.send_photo(
-                chat_id=query.from_user.id,
+                chat_id=user_id,
                 photo=bio,
                 caption=caption,
                 parse_mode='Markdown'
             )
             
-            await query.edit_message_text("✅ **Themed QR Code sent!** Show it off at your next event! 🎉")
+            # Update the original message to show success
+            await query.edit_message_text("✅ **Your QR card has been generated!** Check your messages.")
+            
         else:
-            await query.edit_message_text(
-                "❌ **Themed QR creation failed**\n\n"
-                "Use /myqr for a basic QR code instead."
+            # Fallback to basic QR if card generation fails
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
             )
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            
+            # Create QR code image
+            qr_image = qr.make_image(fill_color="black", back_color="white")
+            
+            bio = io.BytesIO()
+            qr_image.save(bio, format='PNG')
+            bio.seek(0)
+            
+            caption = f"📱 **Your QR Code**\n\n"
+            caption += f"👤 **Your Profile:**\n"
+            caption += f"{profile['name']} | {profile['role']} | {profile['project']}\n"
+            caption += f"{profile['bio']}"
+            
+            # Send as new message
+            await context.bot.send_photo(
+                chat_id=user_id,
+                photo=bio,
+                caption=caption,
+                parse_mode='Markdown'
+            )
+            
+            # Update original message
+            await query.edit_message_text("✅ **Your QR code has been generated!** Check your messages.")
             
     except Exception as e:
-        logger.error(f"Themed QR code generation failed: {e}")
+        logger.error(f"QR code generation from callback failed: {e}")
         await query.edit_message_text(
-            "❌ **Themed QR creation failed**\n\n"
-            f"Error: {str(e)}\n\n"
-            "Use /myqr for a basic QR code instead."
+            "❌ **QR Code generation failed**\n\n"
+            "Please try the /myqr command instead."
         )
 
-async def update_profile_from_callback(query, context):
-    """Handle profile update from callback"""
-    await query.edit_message_text(
-        "✏️ **Update Your Profile**\n\n"
-        "Send your profile in format:\n"
-        "**Name | Role | Project | Bio**\n\n"
-        "Example: John Doe | VC | TechFund | Looking for AI startups"
-    )
-    context.user_data['awaiting_profile'] = True
-
-async def create_instant_group(query, context, target_user_id):
-    """Create group immediately after QR scan"""
-    user_id = query.from_user.id
-    user_profile = await get_user_profile(user_id)
-    target_profile = await get_user_profile(target_user_id)
+def create_card_style_qr(qr_data, username, size=(1200, 675), qr_color=(0, 0, 0)):
+    """Create a card-style QR code with ethglobal.png as background
     
-    if not user_profile or not target_profile:
-        await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
-        return
-    
-    # Check if connection already exists
-    connection_exists = await check_connection_exists(user_id, target_user_id)
-    if connection_exists:
-        # User already has a connection, inform them
-        await query.edit_message_text(
-            f"✅ **Already Connected!**\n\n"
-            f"You're already connected with {target_profile['name']}.\n"
-            f"Use /myconnections to see all your connections."
-        )
-        return
-    
-    # Create group name: Project (UserA) <-> Project (UserB)
-    group_title = f"{user_profile['project']} <-> {target_profile['project']}"
-    group_description = f"LinkUp networking group: {user_profile['name']} & {target_profile['name']}"
-    
-    await query.edit_message_text("🏗️ **Creating your networking group...** ⏳")
-    
+    Args:
+        qr_data: Data to encode in QR
+        username: Telegram username to display
+        size: Card size in pixels (width, height) - default 1200x675 (16:9 aspect ratio)
+        qr_color: RGB tuple for QR code color (default: ETH Cannes blue)
+        
+    Returns:
+        PIL.Image: Card image with QR code
+    """
     try:
-        # Use Telegram API to create empty group with invite link
-        if telegram_api.is_initialized:
-            # Get user database IDs for database connection
-            db_user_profile = await get_user_profile(user_id)
-            db_target_profile = await get_user_profile(target_user_id)
-            
-            if not db_user_profile or not db_target_profile:
-                logger.error(f"Could not find database profiles for users {user_id} and {target_user_id}")
-                raise Exception("Failed to retrieve database profiles")
-            
-            db_user_id = db_user_profile['user_id']
-            db_target_user_id = db_target_profile['user_id']
-            
-            # Create empty group and get invite link
-            group_info = await telegram_api.create_group(
-                group_title=group_title,
-                description=group_description
-            )
-            
-            if not group_info or not group_info.get('invite_link'):
-                logger.error("Failed to create Telegram group or get invite link")
-                raise Exception("Telegram group creation failed")
-            
-            # Now create the connection in database with real group link
-            result = api_client.create_group(
-                group_link=group_info['invite_link'],
-                user1_id=db_user_id,
-                user2_id=db_target_user_id,
-                event_name="QR Code Connection"
-            )
-            
-            if result and 'group_id' in result:
-                logger.info(f"Created connection group {result['group_id']} between users {user_id} and {target_user_id}")
-                
-                # Send response with group info
-                success_message = f"🎉 **Group Created Successfully!**\n\n"
-                success_message += f"**Group:** {group_info['group_title']}\n"
-                success_message += f"**Members:** {group_info['member_count']}\n"
-                success_message += f"🔗 **Join your group:**\n{group_info['invite_link']}\n\n"
-                success_message += f"✅ {target_profile['name']} will receive their invite link from the bot!\n\n"
-                success_message += f"💾 **Connection saved to database.**"
-                
-                await query.edit_message_text(success_message)
-                
-                # Send invite link to target user via BOT (not API user)
-                try:
-                    await context.bot.send_message(
-                        chat_id=target_user_id,
-                        text=f"🎉 **You've been invited to a networking group!**\n\n"
-                             f"**Group:** {group_info['group_title']}\n"
-                             f"**Created by:** {user_profile['name']} ({user_profile['role']})\n\n"
-                             f"🔗 **Join here:** {group_info['invite_link']}\n\n"
-                             f"💡 **About {user_profile['name']}:**\n"
-                             f"🏢 Role: {user_profile['role']}\n"
-                             f"🚀 Project: {user_profile['project']}\n"
-                             f"💬 Bio: {user_profile['bio']}\n\n"
-                             f"Click the link to join and start networking! 🚀\n\n"
-                             f"💾 **This connection is saved in your LinkUp profile.**"
-                    )
-                    logger.info(f"Bot sent group invite to user {target_user_id}")
-                except Exception as e:
-                    logger.error(f"Failed to send bot invite to user {target_user_id}: {e}")
-                
-                return  # Successfully created group
-            else:
-                logger.error("Failed to create database connection")
-                raise Exception("Database connection creation failed")
-        
-        # Fallback if API fails
-        raise Exception("Telegram API group creation failed")
-        
-    except Exception as e:
-        logger.error(f"Group creation failed: {e}")
-        
-        # Fallback to manual instructions
-        fallback_message = f"❌ **Auto group creation failed**\n\n"
-        fallback_message += f"Don't worry! Here are manual instructions:\n\n"
-        fallback_message += f"**Group Name:** {group_title}\n\n"
-        fallback_message += f"**Manual Setup:**\n"
-        fallback_message += f"1. Create new group in Telegram\n"
-        fallback_message += f"2. Add: {target_profile['name']}\n"
-        fallback_message += f"3. Set name: {group_title}\n"
-        fallback_message += f"4. Start networking! 🚀\n\n"
-        fallback_message += f"💾 **Your connection is still saved in the database.**"
-        
-        await query.edit_message_text(fallback_message)
-
-async def view_user_profile(query, context, target_user_id):
-    """View user profile details"""
-    target_profile = await get_user_profile(target_user_id)
-    
-    if not target_profile:
-        await query.edit_message_text("❌ User profile not found.")
-        return
-    
-    profile_message = f"👤 **Profile: {target_profile['name']}**\n\n"
-    profile_message += f"🏢 **Role:** {target_profile['role']}\n"
-    profile_message += f"🚀 **Project:** {target_profile['project']}\n"
-    profile_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
-    profile_message += f"**Connected!** You can now message each other directly."
-    
-    await query.edit_message_text(profile_message)
-
-async def create_instant_connection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_user_id: int):
-    """Create instant connection and group between two users"""
-    
-    # Get profiles
-    user_profile = await get_user_profile(user_id)
-    target_profile = await get_user_profile(target_user_id)
-    
-    if not user_profile or not target_profile:
-        await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
-        return
-    
-    # Create connection in database
-    connection_created = await create_connection_in_database(user_id, target_user_id, event_name="Direct Connection")
-    
-    if not connection_created:
-        await update.message.reply_text("❌ Failed to create connection. Please try again.")
-        return
-    
-    # Create group name
-    group_name = f"{user_profile['name']} ↔ {target_profile['name']}"
-    
-    # Try to create actual Telegram group automatically
-    try:
-        # Create group title
-        group_title = f"{user_profile['name']} ↔ {target_profile['name']}"
-        
+        # Load background image
+        bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ethglobal.jpg')
         try:
-            # Create an invite link approach - more reliable
-            invite_link_message = f"🎉 **Instant Connection + Auto Group!**\n\n"
-            invite_link_message += f"**Connected with:** {target_profile['name']}\n"
-            invite_link_message += f"🏢 **Role:** {target_profile['role']}\n"
-            invite_link_message += f"🚀 **Project:** {target_profile['project']}\n"
-            invite_link_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
-            
-            # Create a group by having the bot start a group conversation
-            # This is a workaround since direct group creation has limitations
-            
-            # Send the invite to create the group
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏗️ Create Group Now", callback_data=f"create_group_{target_user_id}")]
-            ])
-            
-            invite_link_message += f"**🏗️ Ready to create your networking group!**\n"
-            invite_link_message += f"Click the button below to create a group chat.\n\n"
-            invite_link_message += f"💾 **Connection saved to database.**"
-            
-            await update.message.reply_text(invite_link_message, reply_markup=keyboard)
-            
-        except Exception as group_error:
-            logger.error(f"Group creation failed: {group_error}")
-            
-            # Fallback to connection without auto group
-            success_message = f"🎉 **Instant Connection Created!**\n\n"
-            success_message += f"**You're now connected with:**\n"
-            success_message += f"👤 **{target_profile['name']}**\n"
-            success_message += f"🏢 **Role:** {target_profile['role']}\n"
-            success_message += f"🚀 **Project:** {target_profile['project']}\n"
-            success_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
-            success_message += f"💡 **Next Steps:**\n"
-            success_message += f"• You can now message each other directly\n"
-            success_message += f"• Use /creategroup {target_user_id} to create a group\n"
-            success_message += f"• View all connections: /myconnections\n\n"
-            success_message += f"💾 **Connection saved to database.**"
-            
-            await update.message.reply_text(success_message)
-        
-        # Notify the target user
-        try:
-            target_message = f"🎉 **New Connection!**\n\n"
-            target_message += f"**{user_profile['name']}** just connected with you!\n\n"
-            target_message += f"🏢 **Their Role:** {user_profile['role']}\n"
-            target_message += f"🚀 **Their Project:** {user_profile['project']}\n"
-            target_message += f"💬 **Their Bio:** {user_profile['bio']}\n\n"
-            target_message += f"💡 **Start networking!** Use /myconnections to see all your connections.\n\n"
-            target_message += f"💾 **Connection saved to your LinkUp profile.**"
-            
-            await context.bot.send_message(
-                chat_id=target_user_id,
-                text=target_message
-            )
+            bg_image = Image.open(bg_path)
+            # Resize background to fit card size while maintaining aspect ratio
+            bg_image = bg_image.resize(size, Image.Resampling.LANCZOS)
         except Exception as e:
-            logger.info(f"Could not notify target user {target_user_id}: {e}")
-            # This is fine - they'll see the connection when they check the bot
+            logging.error(f"Failed to load background image: {e}")
+            # Create fallback gradient background
+            bg_image = Image.new('RGB', size, (14, 165, 233))
+            draw = ImageDraw.Draw(bg_image)
+            for y in range(size[1]):
+                ratio = y / size[1]
+                r = int(14 * (1 - ratio) + 42 * ratio)
+                g = int(165 * (1 - ratio) + 206 * ratio)
+                b = int(233 * (1 - ratio) + 204 * ratio)
+                draw.line([(0, y), (size[0], y)], fill=(r, g, b))
+        
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,  # High error correction for better design
+            box_size=10,
+            border=0,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        
+        # Create QR image with specified color
+        qr_img = qr.make_image(fill_color=qr_color, back_color='white')
+        
+        # Calculate QR code size and position (centered)
+        qr_size = min(size) // 3  # QR takes about 1/3 of the shortest dimension
+        qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+        
+        # Create a new blank image with the background
+        card = Image.new('RGBA', size, (0, 0, 0, 0))
+        if bg_image.mode != 'RGBA':
+            bg_image = bg_image.convert('RGBA')
+        card.paste(bg_image, (0, 0))
+        
+        # Calculate QR container size
+        qr_container_width = int(qr_size * 1.5)
+        qr_container_height = int(qr_size * 1.8)  # Taller to accommodate username below
+        
+        # Calculate QR container position (centered)
+        container_x = (size[0] - qr_container_width) // 2
+        container_y = (size[1] - qr_container_height) // 2
+        
+        # Create translucent gray container with blur effect simulation
+        # Since PIL doesn't have a direct blur effect for regions, we'll simulate it with a semi-transparent overlay
+        container = Image.new('RGBA', (qr_container_width, qr_container_height), (255, 255, 255, 128))
+        
+        # Add a subtle border to the container
+        container_border = Image.new('RGBA', (qr_container_width, qr_container_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(container_border)
+        draw.rectangle([0, 0, qr_container_width-1, qr_container_height-1], outline=(255, 255, 255, 180), width=2)
+        
+        # Add some noise to simulate blur
+        for _ in range(100):
+            x = random.randint(0, qr_container_width-1)
+            y = random.randint(0, qr_container_height-1)
+            radius = random.randint(1, 3)
+            alpha = random.randint(5, 20)
+            draw.ellipse([x-radius, y-radius, x+radius, y+radius], fill=(255, 255, 255, alpha))
+        
+        # Composite the container with border
+        container = Image.alpha_composite(container, container_border)
+        
+        # Paste container onto card
+        card.paste(container, (container_x, container_y), container)
+        
+        # Calculate QR position within container (centered horizontally, higher vertically)
+        qr_x = container_x + (qr_container_width - qr_size) // 2
+        qr_y = container_y + (qr_container_height - qr_size) // 3  # Place higher to leave room for text
+        
+        # Paste QR code onto card
+        card.paste(qr_img, (qr_x, qr_y))
+        
+        # Add username text below QR code
+        draw = ImageDraw.Draw(card)
+        
+        # Try to load fonts
+        font_paths = [
+            "/System/Library/Fonts/Helvetica.ttc",  # macOS
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
+            "arial.ttf",  # Windows
+        ]
+        
+        username_font = None
+        for font_path in font_paths:
+            try:
+                username_font = ImageFont.truetype(font_path, 60)
+                break
+            except (OSError, IOError):
+                continue
+        
+        # Fallback to default if no fonts found
+        if username_font is None:
+            username_font = ImageFont.load_default()
+        
+        # Format the username
+        if username:
+            username_text = f"@{username}" if not username.startswith('@') else username
+            
+            # Get text width
+            bbox = draw.textbbox((0, 0), username_text, font=username_font)
+            username_width = bbox[2] - bbox[0]
+            
+            # Position username at bottom of container
+            username_x = container_x + (qr_container_width - username_width) // 2
+            username_y = qr_y + qr_size + 20
+            
+            # Add text with the same color as QR code for consistency
+            draw.text(
+                (username_x, username_y), 
+                username_text, 
+                fill=qr_color, 
+                font=username_font
+            )
+        
+        return card.convert('RGB')
         
     except Exception as e:
-        logger.error(f"Failed to create group: {e}")
-        # Still created the connection in database, just inform user
-        await update.message.reply_text(
-            f"🎉 **Connection Created!**\n\n"
-            f"You're now connected with **{target_profile['name']}**!\n"
-            f"Use /myconnections to see all your connections.\n\n"
-            f"💾 **Connection saved to database.**"
-        )
+        logging.error(f"Card QR generation failed: {e}")
+        return None
 
-async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle instant connection request"""
-    user_id = update.effective_user.id
+# QR color options
+QR_COLORS = {
+    'blue': (0, 155, 208),  # ETH Cannes blue
+    'purple': (147, 51, 234),  # Vibrant purple
+    'orange': (251, 146, 60),  # Vibrant orange
+    'green': (34, 197, 94),  # Vibrant green
+    'red': (239, 68, 68),  # Vibrant red
+}
+
+async def show_themed_qr_menu(query, context):
+    """Show themed QR code menu"""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔵 Blue QR", callback_data="qr_color_blue")],
+        [InlineKeyboardButton("🟣 Purple QR", callback_data="qr_color_purple"),
+         InlineKeyboardButton("🟠 Orange QR", callback_data="qr_color_orange")],
+        [InlineKeyboardButton("🟢 Green QR", callback_data="qr_color_green"),
+         InlineKeyboardButton("🔴 Red QR", callback_data="qr_color_red")],
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data="back_to_start")]
+    ])
     
-    if not context.args:
-        await update.message.reply_text("Usage: /connect [user_id]")
-        return
-    
-    try:
-        target_user_id = int(context.args[0])
-        
-        target_profile = await get_user_profile(target_user_id)
-        if not target_profile:
-            await update.message.reply_text("❌ User not found")
-            return
-        
-        if target_user_id == user_id:
-            await update.message.reply_text("❌ You cannot connect with yourself!")
-            return
-        
-        # Check if already connected
-        connection_exists = await check_connection_exists(user_id, target_user_id)
-        if connection_exists:
-            await update.message.reply_text(
-                f"✅ **Already Connected!**\n\n"
-                f"You're already connected with {target_profile['name']}.\n"
-                f"Use /myconnections to see all your connections."
-            )
-            return
-        
-        # Create instant connection
-        await create_instant_connection(update, context, user_id, target_user_id)
-        
-    except ValueError:
-        await update.message.reply_text("❌ Invalid user ID")
+    await query.edit_message_text(
+        "🎨 **Choose Your QR Color**\n\n"
+        "Select a color for your ETHCC QR code:\n\n"
+        "🔵 **Blue** - ETH Cannes official blue\n"
+        "🟣 **Purple** - Vibrant purple\n"
+        "🟠 **Orange** - Vibrant orange\n"
+        "🟢 **Green** - Vibrant green\n"
+        "🔴 **Red** - Vibrant red\n\n"
+        "💡 **Tip:** Share your QR code at events to connect!",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle button callbacks including auto group creation"""
+    """Handle all callback queries"""
     query = update.callback_query
     await query.answer()
     
+    logger.info(f"Callback received: {query.data}")
+    
+    # Handle QR code generation
     if query.data == "generate_qr":
-        # Handle QR generation from start menu
         await generate_qr_from_callback(query, context)
         return
     
-    elif query.data == "update_profile":
-        # Handle profile update from start menu
-        await update_profile_from_callback(query, context)
-        return
-    
+    # Handle themed QR code menu
     elif query.data == "themed_qr_menu":
-        # Handle themed QR menu
         await show_themed_qr_menu(query, context)
         return
     
-    # elif query.data == "launch_webapp":
-    #     # Launch the web app
-    #     webapp_url = f"{WEBAPP_BASE_URL}/webapp/"
-    #     keyboard = InlineKeyboardMarkup([
-    #         [InlineKeyboardButton("🚀 Launch LinkUp App", web_app=WebAppInfo(url=webapp_url))]
-    #     ])
-    #     await query.edit_message_text(
-    #         "📱 **Launch LinkUp Web App**\n\n"
-    #         "Click the button below to open the modern LinkUp interface:",
-    #         reply_markup=keyboard,
-    #         parse_mode='Markdown'
-    #     )
-    #     return
-    
-    elif query.data.startswith("themed_qr_"):
-        # Handle themed QR generation
-        theme = query.data.replace("themed_qr_", "")
-        await generate_themed_qr_callback(query, context, theme)
+    # Handle QR color selection
+    elif query.data.startswith("qr_color_"):
+        color_name = query.data.replace("qr_color_", "")
+        await generate_qr_with_color(query, context, color_name)
         return
     
-    elif query.data.startswith("instant_group_"):
-        # Legacy handling for instant group creation from QR scan
-        # We now create groups automatically when QR is scanned
-        target_user_id = int(query.data.replace("instant_group_", ""))
+    # Handle profile update
+    elif query.data == "update_profile":
+        await update_profile_from_callback(query, context)
+        return
+    
+    # Handle view connections
+    elif query.data == "view_connections":
+        user_id = query.from_user.id
+        connections = await get_user_connections(user_id)
+        
+        if not connections:
+            await query.edit_message_text(
+                "📭 **No connections yet**\n\n"
+                "Scan QR codes at events to connect with others!\n\n"
+                "Generate your own QR code with /myqr and share it.",
+                parse_mode='Markdown',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📱 Get My QR", callback_data="generate_qr"),
+                    InlineKeyboardButton("◀️ Back", callback_data="back_to_start")
+                ]])
+            )
+            return
+        
+        # Build connections message
+        message = "🤝 **Your Connections:**\n\n"
+        connection_buttons = []
+        
+        for i, connection in enumerate(connections, 1):
+            message += f"{i}. **{connection['name']}**\n"
+            message += f"   🏢 {connection['role']} at {connection['project']}\n"
+            if connection.get('event_name'):
+                message += f"   📍 Event: {connection['event_name']}\n"
+            message += "\n"
+            
+            # Add button for this connection
+            connection_buttons.append([
+                InlineKeyboardButton(
+                    f"👤 {connection['name']}",
+                    callback_data=f"view_profile_{connection['tg_id']}"
+                )
+            ])
+        
+        # Add create group button if there are connections
+        connection_buttons.append([
+            InlineKeyboardButton("👥 Create Group", callback_data="create_group_menu")
+        ])
+        
+        # Add back button
+        connection_buttons.append([
+            InlineKeyboardButton("◀️ Back", callback_data="back_to_start")
+        ])
+        
         await query.edit_message_text(
-            "⚙️ **Process Updated!**\n\n"
-            "Groups are now created automatically when QR codes are scanned.\n"
-            "Please scan the QR code again to create your group."
+            message,
+            reply_markup=InlineKeyboardMarkup(connection_buttons),
+            parse_mode='Markdown'
+        )
+        return
+        
+    # Handle create group menu
+    elif query.data == "create_group_menu":
+        user_id = query.from_user.id
+        connections = await get_user_connections(user_id)
+        
+        if not connections:
+            await query.edit_message_text(
+                "📭 **No connections found!**\n\n"
+                "You need to connect with someone first before creating a group.\n"
+                "Use /myqr to share your QR code and connect with others!",
+                parse_mode='Markdown',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Back", callback_data="view_connections")
+                ]])
+            )
+            return
+        
+        # Build connection list for group creation
+        message = "👥 **Create Group with Connections**\n\n"
+        message += "Select connections to add to your group:\n\n"
+        
+        group_buttons = []
+        for i, connection in enumerate(connections, 1):
+            message += f"{i}. **{connection['name']}** - {connection['role']}\n"
+            
+            # Create button for each connection
+            group_buttons.append([
+                InlineKeyboardButton(
+                    f"➕ {connection['name']}",
+                    callback_data=f"create_group_{connection['tg_id']}"
+                )
+            ])
+        
+        # Add back button
+        group_buttons.append([
+            InlineKeyboardButton("◀️ Back", callback_data="view_connections")
+        ])
+        
+        await query.edit_message_text(
+            message,
+            reply_markup=InlineKeyboardMarkup(group_buttons),
+            parse_mode='Markdown'
         )
         return
     
@@ -1754,9 +1856,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle back to start menu
         user_name = get_full_name(query.from_user)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Basic QR Code", callback_data="generate_qr")],
-            [InlineKeyboardButton("🎨 Themed QR Code", callback_data="themed_qr_menu")],
-            [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile")]
+            [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
+             InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
+            [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
+             InlineKeyboardButton("👥 My Connections", callback_data="view_connections")]
         ])
         
         welcome_text = f"""
@@ -1764,11 +1867,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Your personal networking assistant for events.
 
-**Quick Actions:**
+**Available Commands:**
+
+📋 **Profile Management**:
+• /profile - Set up or update your profile
+• /myqr - Generate a basic QR code to share
+• /themedqr - Create a stylish themed QR code
+
+👥 **Networking**:
+• /myconnections - View all your connections
+• /creategroup - Create a group chat with your connections
+• /scan - Scan a QR code from image (reply to an image)
+• /connect [user_id] - Connect with a user by ID
+
+📱 **Quick Actions:**
+Use the buttons below for fast access to common features!
         """
-        await query.edit_message_text(welcome_text, reply_markup=keyboard)
+        await query.edit_message_text(welcome_text, reply_markup=keyboard, parse_mode='Markdown')
         return
-    
+        
     elif query.data.startswith("create_group_"):
         # Handle auto group creation using actual Telegram API
         target_user_id = int(query.data.replace("create_group_", ""))
@@ -1887,6 +2004,7 @@ Your personal networking assistant for events.
         manual_instructions += f"💡 **Pro tip:** Both users will get notifications about this group!"
         
         await query.edit_message_text(manual_instructions)
+        
     elif query.data.startswith("share_contact_"):
         # Handle contact sharing
         target_user_id = int(query.data.replace("share_contact_", ""))
@@ -1913,6 +2031,7 @@ Your personal networking assistant for events.
         contact_info += f"4. Add them to your group! 🚀"
         
         await query.edit_message_text(contact_info)
+        
     else:
         # For any other callbacks, show instant connections message
         await query.edit_message_text(
@@ -2134,10 +2253,15 @@ async def initialize_app(application):
     # Initialize Telegram API client
     logger.info("Initializing Telegram API client...")
     api_success = await initialize_telegram_api()
+    
     if api_success:
         logger.info("✅ Telegram API client initialized - Group creation available!")
     else:
         logger.warning("⚠️ Telegram API client failed to initialize - Using fallback mode")
+    
+    # Log ETHCC theme information
+    logger.info("🔷 ETHCC theme active - QR codes will use ETHCC styling by default")
+    print("\033[96m" + "ETHCC theme enabled! QR codes will use the official ETHCC colors and design." + "\033[0m")
     
     return api_success
 
@@ -2191,11 +2315,383 @@ def generate_qr_code_image(tg_id, size=300):
         logger.error(f"QR code generation failed: {e}")
         return None
 
+async def update_profile_from_callback(query, context):
+    """Handle profile update from callback"""
+    await query.edit_message_text(
+        "✏️ **Update Your Profile**\n\n"
+        "Send your profile in format:\n"
+        "**Name | Role | Project | Bio**\n\n"
+        "Example: John Doe | VC | TechFund | Looking for AI startups"
+    )
+    context.user_data['awaiting_profile'] = True
+
+async def create_instant_group(query, context, target_user_id):
+    """Create group immediately after QR scan"""
+    user_id = query.from_user.id
+    user_profile = await get_user_profile(user_id)
+    target_profile = await get_user_profile(target_user_id)
+    
+    if not user_profile or not target_profile:
+        await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
+        return
+    
+    # Check if connection already exists
+    connection_exists = await check_connection_exists(user_id, target_user_id)
+    if connection_exists:
+        # User already has a connection, inform them
+        await query.edit_message_text(
+            f"✅ **Already Connected!**\n\n"
+            f"You're already connected with {target_profile['name']}.\n"
+            f"Use /myconnections to see all your connections."
+        )
+        return
+    
+    # Create group name: Project (UserA) <-> Project (UserB)
+    group_title = f"{user_profile['project']} <-> {target_profile['project']}"
+    group_description = f"LinkUp networking group: {user_profile['name']} & {target_profile['name']}"
+    
+    await query.edit_message_text("🏗️ **Creating your networking group...** ⏳")
+    
+    try:
+        # Use Telegram API to create empty group with invite link
+        if telegram_api.is_initialized:
+            # Get user database IDs for database connection
+            db_user_profile = await get_user_profile(user_id)
+            db_target_profile = await get_user_profile(target_user_id)
+            
+            if not db_user_profile or not db_target_profile:
+                logger.error(f"Could not find database profiles for users {user_id} and {target_user_id}")
+                raise Exception("Failed to retrieve database profiles")
+            
+            db_user_id = db_user_profile['user_id']
+            db_target_user_id = db_target_profile['user_id']
+            
+            # Create empty group and get invite link
+            group_info = await telegram_api.create_group(
+                group_title=group_title,
+                description=group_description
+            )
+            
+            if not group_info or not group_info.get('invite_link'):
+                logger.error("Failed to create Telegram group or get invite link")
+                raise Exception("Telegram group creation failed")
+            
+            # Now create the connection in database with real group link
+            result = api_client.create_group(
+                group_link=group_info['invite_link'],
+                user1_id=db_user_id,
+                user2_id=db_target_user_id,
+                event_name="QR Code Connection"
+            )
+            
+            if result and 'group_id' in result:
+                logger.info(f"Created connection group {result['group_id']} between users {user_id} and {target_user_id}")
+                
+                # Send response with group info
+                success_message = f"🎉 **Group Created Successfully!**\n\n"
+                success_message += f"**Group:** {group_info['group_title']}\n"
+                success_message += f"**Members:** {group_info['member_count']}\n"
+                success_message += f"🔗 **Join your group:**\n{group_info['invite_link']}\n\n"
+                success_message += f"✅ {target_profile['name']} will receive their invite link from the bot!\n\n"
+                success_message += f"💾 **Connection saved to database.**"
+                
+                await query.edit_message_text(success_message)
+                
+                # Send invite link to target user via BOT (not API user)
+                try:
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=f"🎉 **You've been invited to a networking group!**\n\n"
+                             f"**Group:** {group_info['group_title']}\n"
+                             f"**Created by:** {user_profile['name']} ({user_profile['role']})\n\n"
+                             f"🔗 **Join here:** {group_info['invite_link']}\n\n"
+                             f"💡 **About {user_profile['name']}:**\n"
+                             f"🏢 Role: {user_profile['role']}\n"
+                             f"🚀 Project: {user_profile['project']}\n"
+                             f"💬 Bio: {user_profile['bio']}\n\n"
+                             f"Click the link to join and start networking! 🚀\n\n"
+                             f"💾 **This connection is saved in your LinkUp profile.**"
+                    )
+                    logger.info(f"Bot sent group invite to user {target_user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send bot invite to user {target_user_id}: {e}")
+                
+                return  # Successfully created group
+            else:
+                logger.error("Failed to create database connection")
+                raise Exception("Database connection creation failed")
+        
+        # Fallback if API fails
+        raise Exception("Telegram API group creation failed")
+        
+    except Exception as e:
+        logger.error(f"Group creation failed: {e}")
+        
+        # Fallback to manual instructions
+        fallback_message = f"❌ **Auto group creation failed**\n\n"
+        fallback_message += f"Don't worry! Here are manual instructions:\n\n"
+        fallback_message += f"**Group Name:** {group_title}\n\n"
+        fallback_message += f"**Manual Setup:**\n"
+        fallback_message += f"1. Create new group in Telegram\n"
+        fallback_message += f"2. Add: {target_profile['name']}\n"
+        fallback_message += f"3. Set name: {group_title}\n"
+        fallback_message += f"4. Start networking! 🚀\n\n"
+        fallback_message += f"💾 **Your connection is still saved in the database.**"
+        
+        await query.edit_message_text(fallback_message)
+
+async def view_user_profile(query, context, target_user_id):
+    """View user profile details"""
+    target_profile = await get_user_profile(target_user_id)
+    
+    if not target_profile:
+        await query.edit_message_text("❌ User profile not found.")
+        return
+    
+    profile_message = f"👤 **Profile: {target_profile['name']}**\n\n"
+    profile_message += f"🏢 **Role:** {target_profile['role']}\n"
+    profile_message += f"🚀 **Project:** {target_profile['project']}\n"
+    profile_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+    profile_message += f"**Connected!** You can now message each other directly."
+    
+    # Add buttons for actions
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 Create Group Chat", callback_data=f"create_group_{target_user_id}")],
+        [InlineKeyboardButton("◀️ Back to Connections", callback_data="view_connections")]
+    ])
+    
+    await query.edit_message_text(
+        profile_message, 
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+
+async def create_instant_connection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_user_id: int):
+    """Create instant connection and group between two users"""
+    
+    # Get profiles
+    user_profile = await get_user_profile(user_id)
+    target_profile = await get_user_profile(target_user_id)
+    
+    if not user_profile or not target_profile:
+        await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
+        return
+    
+    # Create connection in database
+    connection_created = await create_connection_in_database(user_id, target_user_id, event_name="Direct Connection")
+    
+    if not connection_created:
+        await update.message.reply_text("❌ Failed to create connection. Please try again.")
+        return
+    
+    # Create group name
+    group_name = f"{user_profile['name']} ↔ {target_profile['name']}"
+    
+    # Try to create actual Telegram group automatically
+    try:
+        # Create group title
+        group_title = f"{user_profile['name']} ↔ {target_profile['name']}"
+        
+        try:
+            # Create an invite link approach - more reliable
+            invite_link_message = f"🎉 **Instant Connection + Auto Group!**\n\n"
+            invite_link_message += f"**Connected with:** {target_profile['name']}\n"
+            invite_link_message += f"🏢 **Role:** {target_profile['role']}\n"
+            invite_link_message += f"🚀 **Project:** {target_profile['project']}\n"
+            invite_link_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            
+            # Create a group by having the bot start a group conversation
+            # This is a workaround since direct group creation has limitations
+            
+            # Send the invite to create the group
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏗️ Create Group Now", callback_data=f"create_group_{target_user_id}")]
+            ])
+            
+            invite_link_message += f"**🏗️ Ready to create your networking group!**\n"
+            invite_link_message += f"Click the button below to create a group chat.\n\n"
+            invite_link_message += f"💾 **Connection saved to database.**"
+            
+            await update.message.reply_text(invite_link_message, reply_markup=keyboard)
+            
+        except Exception as group_error:
+            logger.error(f"Group creation failed: {group_error}")
+            
+            # Fallback to connection without auto group
+            success_message = f"🎉 **Instant Connection Created!**\n\n"
+            success_message += f"**You're now connected with:**\n"
+            success_message += f"👤 **{target_profile['name']}**\n"
+            success_message += f"🏢 **Role:** {target_profile['role']}\n"
+            success_message += f"🚀 **Project:** {target_profile['project']}\n"
+            success_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            success_message += f"💡 **Next Steps:**\n"
+            success_message += f"• You can now message each other directly\n"
+            success_message += f"• Use /creategroup {target_user_id} to create a group\n"
+            success_message += f"• View all connections: /myconnections\n\n"
+            success_message += f"💾 **Connection saved to database.**"
+            
+            await update.message.reply_text(success_message)
+        
+        # Notify the target user
+        try:
+            target_message = f"🎉 **New Connection!**\n\n"
+            target_message += f"**{user_profile['name']}** just connected with you!\n\n"
+            target_message += f"🏢 **Their Role:** {user_profile['role']}\n"
+            target_message += f"🚀 **Their Project:** {user_profile['project']}\n"
+            target_message += f"💬 **Their Bio:** {user_profile['bio']}\n\n"
+            target_message += f"💡 **Start networking!** Use /myconnections to see all your connections.\n\n"
+            target_message += f"💾 **Connection saved to your LinkUp profile.**"
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=target_message
+            )
+        except Exception as e:
+            logger.info(f"Could not notify target user {target_user_id}: {e}")
+            # This is fine - they'll see the connection when they check the bot
+        
+    except Exception as e:
+        logger.error(f"Failed to create group: {e}")
+        # Still created the connection in database, just inform user
+        await update.message.reply_text(
+            f"🎉 **Connection Created!**\n\n"
+            f"You're now connected with **{target_profile['name']}**!\n"
+            f"Use /myconnections to see all your connections.\n\n"
+            f"💾 **Connection saved to database.**"
+        )
+
+async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle instant connection request"""
+    user_id = update.effective_user.id
+    
+    if not context.args:
+        await update.message.reply_text("Usage: /connect [user_id]")
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        
+        target_profile = await get_user_profile(target_user_id)
+        if not target_profile:
+            await update.message.reply_text("❌ User not found")
+            return
+        
+        if target_user_id == user_id:
+            await update.message.reply_text("❌ You cannot connect with yourself!")
+            return
+        
+        # Check if already connected
+        connection_exists = await check_connection_exists(user_id, target_user_id)
+        if connection_exists:
+            await update.message.reply_text(
+                f"✅ **Already Connected!**\n\n"
+                f"You're already connected with {target_profile['name']}.\n"
+                f"Use /myconnections to see all your connections."
+            )
+            return
+        
+        # Create instant connection
+        await create_instant_connection(update, context, user_id, target_user_id)
+        
+    except ValueError:
+        await update.message.reply_text("❌ Invalid user ID")
+
+async def generate_qr_with_color(query, context, color_name):
+    """Generate QR with selected color"""
+    user_id = query.from_user.id
+    user_name = get_full_name(query.from_user)
+    
+    # Create basic profile if user doesn't have one
+    profile = await get_user_profile(user_id)
+    if not profile:
+        username = query.from_user.username or user_name.replace(' ', '').lower()
+        basic_profile = {
+            'name': user_name,
+            'username': username,
+            'role': 'Not specified',
+            'project': f"{user_name}'s Project",
+            'bio': 'LinkUp User'
+        }
+        success = await create_or_update_user_profile(user_id, basic_profile)
+        if success:
+            profile = await get_user_profile(user_id)
+        else:
+            await query.edit_message_text("❌ Failed to create your profile. Please try again.")
+            return
+    
+    # Get QR data
+    try:
+        bot_info = await context.bot.get_me()
+        bot_username = bot_info.username
+        qr_data = f"https://t.me/{bot_username}?start=user_{user_id}"
+    except Exception as e:
+        logger.error(f"Could not get bot username: {e}")
+        qr_data = f"LinkUp://user/{user_id}"
+    
+    # Generate username for QR
+    username = profile.get('username', profile['name'].replace(' ', '').lower())
+    
+    # Get color from the color map
+    qr_color = QR_COLORS.get(color_name, QR_COLORS['blue'])  # Default to blue if color not found
+    
+    await query.edit_message_text(f"🎨 **Creating your {color_name.title()} QR card...** ⏳")
+    
+    try:
+        # Create card style QR with specified color
+        card_qr = create_card_style_qr(qr_data, username, qr_color=qr_color)
+        
+        if card_qr:
+            bio = io.BytesIO()
+            card_qr.save(bio, format='PNG', quality=95)
+            bio.seek(0)
+            
+            caption = f"🎨 **Your {color_name.title()} ETHCC QR Card**\n\n"
+            caption += f"👤 **Profile:** {profile['name']}\n"
+            caption += f"🏢 **Role:** {profile['role']}\n"
+            caption += f"🚀 **Project:** {profile['project']}\n\n"
+            caption += f"💡 **Share this QR card at ETHCC events!**"
+            
+            await context.bot.send_photo(
+                chat_id=query.from_user.id,
+                photo=bio,
+                caption=caption,
+                parse_mode='Markdown'
+            )
+            
+            await query.edit_message_text(f"✅ **{color_name.title()} ETHCC QR Card sent!** Show it off at your next event! 🎉")
+        else:
+            await query.edit_message_text(
+                "❌ **QR card creation failed**\n\n"
+                "Use /myqr for a basic QR code instead."
+            )
+            
+    except Exception as e:
+        logger.error(f"QR card generation failed: {e}")
+        await query.edit_message_text(
+            "❌ **QR card creation failed**\n\n"
+            f"Error: {str(e)}\n\n"
+            "Use /myqr for a basic QR code instead."
+        )
+
 def main():
     """Main function"""
     token = os.getenv("TOKEN")
     if not token:
         raise ValueError("TOKEN environment variable not set")
+    
+    # ETHCC-themed ASCII art banner
+    ethcc_banner = """
+    ███████╗████████╗██╗  ██╗ ██████╗ ██████╗     ██████╗  ██████╗ ████████╗
+    ██╔════╝╚══██╔══╝██║  ██║██╔════╝██╔════╝    ██╔══██╗██╔═══██╗╚══██╔══╝
+    █████╗     ██║   ███████║██║     ██║         ██████╔╝██║   ██║   ██║   
+    ██╔══╝     ██║   ██╔══██║██║     ██║         ██╔══██╗██║   ██║   ██║   
+    ███████╗   ██║   ██║  ██║╚██████╗╚██████╗    ██████╔╝╚██████╔╝   ██║   
+    ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝    ╚═════╝  ╚═════╝    ╚═╝   
+                                                                        
+    📱 Networking made easy - Scan, Connect, Chat! 🚀
+    """
+    
+    print(ethcc_banner)
     
     # Build application with hooks
     app = (
@@ -2219,7 +2715,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    logger.info("Starting LinkUp Bot...")
+    logger.info("Starting LinkUp Bot with ETHCC Theme...")
     try:
         app.run_polling()
     except KeyboardInterrupt:

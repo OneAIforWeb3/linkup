@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY bot.py .
 COPY telegram_api.py .
 COPY apis/ ./apis/
+COPY sessions/ ./sessions/
 
 # Create sessions directory for Telegram API
 RUN mkdir -p ./sessions
