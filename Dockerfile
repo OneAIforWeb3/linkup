@@ -28,4 +28,4 @@ COPY start.sh .
 RUN chmod +x start.sh
 
 # Run both bot and API
-ENTRYPOINT ["./start.sh"] 
+ENTRYPOINT ["/bin/sh", "./start.sh"] 

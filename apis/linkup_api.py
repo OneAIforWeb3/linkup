@@ -2,7 +2,7 @@ import os
 
 import mysql.connector
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from mysql.connector import Error
 
 from constants import CHECK_USER_EXISTS_QUERY, INSERT_USER_QUERY, UPDATE_USER_QUERY, DELETE_USER_QUERY, \
@@ -284,6 +284,107 @@ def get_user_groups():
             processed_groups.append(processed_group)
         
         return jsonify({'groups': processed_groups}), 200
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+# Webapp serving routes
+@app.route('/webapp/')
+@app.route('/webapp')
+def serve_webapp():
+    """Serve the main webapp index.html"""
+    try:
+        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'webapp')
+        return send_from_directory(webapp_dir, 'index.html')
+    except Exception as e:
+        return jsonify({'error': f'Webapp not found: {str(e)}'}), 404
+
+@app.route('/webapp/<path:filename>')
+def serve_webapp_assets(filename):
+    """Serve webapp static assets (CSS, JS, images)"""
+    try:
+        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'webapp')
+        return send_from_directory(webapp_dir, filename)
+    except Exception as e:
+        return jsonify({'error': f'Asset not found: {str(e)}'}), 404
+
+# API endpoints for the webapp
+@app.route('/api/generate-qr', methods=['GET'])
+def generate_qr_api():
+    """Generate QR code for webapp"""
+    from bot import generate_qr_code_image
+    import io
+    
+    tg_id = request.args.get('tg_id')
+    if not tg_id:
+        return jsonify({'error': 'Missing tg_id parameter'}), 400
+    
+    try:
+        # Generate QR code image
+        qr_img = generate_qr_code_image(tg_id)
+        
+        # Convert to bytes
+        img_buffer = io.BytesIO()
+        qr_img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        return send_file(img_buffer, mimetype='image/png')
+    except Exception as e:
+        return jsonify({'error': f'Failed to generate QR: {str(e)}'}), 500
+
+@app.route('/api/user-connections', methods=['GET'])
+def get_user_connections_api():
+    """Get user connections for webapp"""
+    tg_id = request.args.get('tg_id')
+    if not tg_id:
+        return jsonify({'error': 'Missing tg_id parameter'}), 400
+    
+    # For now, return empty connections - this would need to be implemented
+    # based on your connection tracking system
+    return jsonify([])
+
+@app.route('/api/update-profile', methods=['PUT'])
+def update_profile_api():
+    """Update user profile for webapp"""
+    data = request.json
+    tg_id = data.get('tg_id')
+    
+    if not tg_id:
+        return jsonify({'error': 'Missing tg_id parameter'}), 400
+    
+    # Update user profile in database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Find user by tg_id
+        cursor.execute("SELECT user_id FROM users WHERE tg_id = %s", (tg_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_id = user[0]
+        
+        # Build update query
+        fields = []
+        values = []
+        for key in ['display_name', 'role', 'project_name', 'description']:
+            if key in data:
+                fields.append(f"{key} = %s")
+                values.append(data[key])
+        
+        if not fields:
+            return jsonify({'error': 'No updatable fields provided'}), 400
+        
+        values.append(user_id)
+        query = f"UPDATE users SET {', '.join(fields)} WHERE user_id = %s"
+        cursor.execute(query, tuple(values))
+        conn.commit()
+        
+        return jsonify({'message': 'Profile updated successfully'}), 200
     except Error as e:
         return jsonify({'error': str(e)}), 500
     finally:

@@ -10,9 +10,9 @@ services:
       - TOKEN=${TOKEN}
       
       # Telegram API Configuration (for group creation)
-      - API_ID=${TELEGRAM_API_ID}
-      - API_HASH=${TELEGRAM_API_HASH}
-      - PHONE_NUMBER=${TELEGRAM_PHONE_NUMBER}
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_PHONE_NUMBER=${TELEGRAM_PHONE_NUMBER}
       - BOT_SESSION_NAME=${BOT_SESSION_NAME:-linkup_bot}
       
       # Database Configuration

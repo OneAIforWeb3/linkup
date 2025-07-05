@@ -25,7 +25,7 @@ api_pid=$!
 sleep 3
 
 # Check if API started successfully
-if ps -p $api_pid > /dev/null; then
+if kill -0 $api_pid 2>/dev/null; then
     echo "✅ Flask API server started (PID: $api_pid)"
 else
     echo "❌ Flask API server failed to start"
@@ -41,7 +41,7 @@ bot_pid=$!
 sleep 3
 
 # Check if bot started successfully
-if ps -p $bot_pid > /dev/null; then
+if kill -0 $bot_pid 2>/dev/null; then
     echo "✅ Telegram bot started (PID: $bot_pid)"
 else
     echo "❌ Telegram bot failed to start"
