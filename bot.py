@@ -7,6 +7,7 @@ A networking assistant for event attendees
 import os
 import logging
 from datetime import datetime
+# from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
@@ -21,6 +22,9 @@ import math
 from typing import List, Dict
 
 load_dotenv()
+
+# # Get base URL for the web app from environment variable or use default
+# WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "https://your-api-domain.com")
 
 def get_full_name(user):
     """Get full name from user object, fallback to first name or user ID"""
@@ -652,6 +656,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 target_user_id = int(context.args[0].replace("user_", ""))
                 logger.info(f"Processing QR scan: user {user_id} scanning user {target_user_id}")
                 
+                # Show immediate processing message
+                processing_message = await update.message.reply_text(
+                    "🔍 **Processing QR Code...**\n\n"
+                    "Creating your connection right away...",
+                    parse_mode='Markdown'
+                )
+                
                 # Create basic profile if user doesn't have one
                 user_profile = await get_user_profile(user_id)
                 if not user_profile:
@@ -669,14 +680,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         logger.info(f"Created basic profile for scanning user {user_id}")
                     else:
                         logger.error(f"Failed to create basic profile for user {user_id}")
-                        await update.message.reply_text("❌ Failed to create your profile. Please try again.")
+                        await processing_message.edit_text("❌ Failed to create your profile. Please try again.")
                         return
                 
                 # Check if target user exists in profiles
                 target_profile = await get_user_profile(target_user_id)
                 if not target_profile:
                     logger.warning(f"Target user {target_user_id} not found in profiles")
-                    await update.message.reply_text(
+                    await processing_message.edit_text(
                         "❌ **User Not Found**\n\n"
                         "The person whose QR code you scanned hasn't set up their LinkUp profile yet.\n\n"
                         "Please ask them to:\n"
@@ -688,25 +699,57 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 
                 if target_user_id == user_id:
-                    await update.message.reply_text("❌ You cannot connect with yourself!")
+                    await processing_message.edit_text("❌ You cannot connect with yourself!")
                     return
                 
                 logger.info(f"Connecting {user_profile['name']} with {target_profile['name']}")
                 
+                # Update the processing message with user info while we check for connection
+                await processing_message.edit_text(
+                    f"🔍 **Processing Connection...**\n\n"
+                    f"Connecting with {target_profile['name']}...\n"
+                    f"Creating your networking group...",
+                    parse_mode='Markdown'
+                )
+                
                 # Check if already connected (using database instead of in-memory)
                 connection_exists = await check_connection_exists(user_id, target_user_id)
                 if connection_exists:
-                    await update.message.reply_text(
-                        f"✅ **Already Connected!**\n\n"
-                        f"You're already connected with {target_profile['name']}.\n"
-                        f"Use /myconnections to see all your connections.",
-                        parse_mode='Markdown'
-                    )
+                    # Get connections to find existing group link
+                    connections = await get_user_connections(user_id)
+                    group_link = None
+                    for connection in connections:
+                        if connection['tg_id'] == target_user_id and connection.get('group_link'):
+                            group_link = connection['group_link']
+                            break
+                    
+                    # If we have a group link, show "Go to Group" button
+                    if group_link:
+                        keyboard = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🚀 Go to Group", url=group_link)],
+                            [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
+                        ])
+                        
+                        message = f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+                        message += f"👤 **{target_profile['name']}**\n"
+                        message += f"🏢 **Role:** {target_profile['role']}\n"
+                        message += f"🚀 **Project:** {target_profile['project']}\n"
+                        message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+                        message += f"You already have a group chat. Click below to go to your existing group!"
+                        
+                        await processing_message.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
+                    else:
+                        # Connected but no group link found
+                        await processing_message.edit_text(
+                            f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+                            f"You're already connected, but no group chat was found.\n"
+                            f"Use /creategroup {target_user_id} to create a new group chat."
+                        )
                     return
                 
-                # Show immediate group creation option
-                logger.info(f"Showing group creation option for users {user_id} and {target_user_id}")
-                await show_group_creation_option(update, context, user_id, target_user_id)
+                # Create group immediately instead of showing option
+                logger.info(f"Creating group immediately for users {user_id} and {target_user_id}")
+                await create_and_show_group_with_message(processing_message, context, user_id, target_user_id)
                 return
                 
             except (ValueError, IndexError) as e:
@@ -1009,6 +1052,13 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     qr_input = ' '.join(context.args)
     
+    # Show immediate processing message
+    processing_message = await update.message.reply_text(
+        "🔍 **Processing QR Code...**\n\n"
+        "Creating your connection right away...",
+        parse_mode='Markdown'
+    )
+    
     # Extract user ID from QR code
     target_user_id = None
     
@@ -1016,7 +1066,7 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             target_user_id = int(qr_input.replace("LinkUp://user/", ""))
         except ValueError:
-            await update.message.reply_text("❌ Invalid QR code format")
+            await processing_message.edit_text("❌ Invalid QR code format")
             return
     elif "?start=user_" in qr_input:
         # Handle Telegram deep link format
@@ -1024,74 +1074,187 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             start_param = qr_input.split("?start=user_")[1]
             target_user_id = int(start_param)
         except (IndexError, ValueError):
-            await update.message.reply_text("❌ Invalid QR code format")
+            await processing_message.edit_text("❌ Invalid QR code format")
             return
     else:
         # Try to parse as direct user ID
         try:
             target_user_id = int(qr_input)
         except ValueError:
-            await update.message.reply_text("❌ Invalid QR code format")
+            await processing_message.edit_text("❌ Invalid QR code format")
             return
     
     # Check if target user exists
     target_profile = await get_user_profile(target_user_id)
     if not target_profile:
-        await update.message.reply_text("❌ User not found or hasn't set up profile")
+        await processing_message.edit_text("❌ User not found or hasn't set up profile")
         return
     
     if target_user_id == user_id:
-        await update.message.reply_text("❌ You cannot connect with yourself!")
+        await processing_message.edit_text("❌ You cannot connect with yourself!")
         return
+    
+    # Update the processing message with user info while we check for connection
+    await processing_message.edit_text(
+        f"🔍 **Processing Connection...**\n\n"
+        f"Connecting with {target_profile['name']}...\n"
+        f"Creating your networking group...",
+        parse_mode='Markdown'
+    )
     
     # Check if already connected
     connection_exists = await check_connection_exists(user_id, target_user_id)
     if connection_exists:
-        await update.message.reply_text(
-            f"✅ **Already Connected!**\n\n"
-            f"You're already connected with {target_profile['name']}.\n"
-            f"Use /myconnections to see all your connections."
-        )
+        # Get connections to find existing group link
+        connections = await get_user_connections(user_id)
+        group_link = None
+        for connection in connections:
+            if connection['tg_id'] == target_user_id and connection.get('group_link'):
+                group_link = connection['group_link']
+                break
+        
+        # If we have a group link, show "Go to Group" button
+        if group_link:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Go to Group", url=group_link)],
+                [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
+            ])
+            
+            message = f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+            message += f"👤 **{target_profile['name']}**\n"
+            message += f"🏢 **Role:** {target_profile['role']}\n"
+            message += f"🚀 **Project:** {target_profile['project']}\n"
+            message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            message += f"You already have a group chat. Click below to go to your existing group!"
+            
+            await processing_message.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
+        else:
+            # Connected but no group link found
+            await processing_message.edit_text(
+                f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+                f"You're already connected, but no group chat was found.\n"
+                f"Use /creategroup {target_user_id} to create a new group chat."
+            )
         return
     
-    # Show group creation option instead of creating instant connection
-    await show_group_creation_option(update, context, user_id, target_user_id)
+    # Create group immediately
+    await create_and_show_group_with_message(processing_message, context, user_id, target_user_id)
 
-async def show_group_creation_option(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_user_id: int):
-    """Show immediate group creation option when users scan QR codes"""
+async def create_and_show_group_with_message(processing_message, context, user_id: int, target_user_id: int):
+    """Create Telegram group immediately when users scan QR codes and show join buttons, using existing message"""
     user_profile = await get_user_profile(user_id)
     target_profile = await get_user_profile(target_user_id)
     
     if not user_profile or not target_profile:
-        await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
+        await processing_message.edit_text("❌ Error retrieving user profiles. Please try again.")
         return
     
-    # Store connection info in context for later retrieval when creating group
-    if 'temp_connections' not in context.bot_data:
-        context.bot_data['temp_connections'] = {}
+    # Create group title and description
+    group_title = f"🤝 {user_profile['name']} ↔ {target_profile['name']}"
+    group_description = f"LinkUp networking group for {user_profile['name']} ({user_profile['role']}) and {target_profile['name']} ({target_profile['role']})"
     
-    # Store the connection info using both users as the key
-    connection_key = f"{min(user_id, target_user_id)}_{max(user_id, target_user_id)}"
-    context.bot_data['temp_connections'][connection_key] = {
-        'user_id': user_id,
-        'target_user_id': target_user_id,
-        'created_at': datetime.now().isoformat()
-    }
-    
-    # Show group creation option
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏗️ Create Group Now", callback_data=f"instant_group_{target_user_id}")],
-        [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
-    ])
-    
-    message = f"🎉 **Connected with {target_profile['name']}!**\n\n"
-    message += f"👤 **{target_profile['name']}**\n"
-    message += f"🏢 **Role:** {target_profile['role']}\n"
-    message += f"🚀 **Project:** {target_profile['project']}\n"
-    message += f"💬 **Bio:** {target_profile['bio']}\n\n"
-    message += f"**Ready to start networking?**"
-    
-    await update.message.reply_text(message, reply_markup=keyboard)
+    try:
+        # Create empty group with Telegram API
+        if telegram_api.is_initialized:
+            # Create empty group and get invite link
+            group_info = await telegram_api.create_group(
+                group_title=group_title,
+                description=group_description
+            )
+            
+            if not group_info or not group_info.get('invite_link'):
+                logger.error("Failed to create Telegram group or get invite link")
+                raise Exception("Telegram group creation failed")
+            
+            # Get user database IDs for database connection
+            db_user_id = user_profile['user_id']
+            db_target_user_id = target_profile['user_id']
+            
+            # Create the connection in database with real group link
+            result = api_client.create_group(
+                group_link=group_info['invite_link'],
+                user1_id=db_user_id,
+                user2_id=db_target_user_id,
+                event_name="QR Code Connection"
+            )
+            
+            if result and 'group_id' in result:
+                logger.info(f"Created connection group {result['group_id']} between users {user_id} and {target_user_id}")
+                
+                # Show join button to scanning user
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Join Group", url=group_info['invite_link'])],
+                    [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
+                ])
+                
+                success_message = f"🎉 **Connected with {target_profile['name']}!**\n\n"
+                success_message += f"👤 **{target_profile['name']}**\n"
+                success_message += f"🏢 **Role:** {target_profile['role']}\n"
+                success_message += f"🚀 **Project:** {target_profile['project']}\n"
+                success_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+                success_message += f"Your group has been created! Click below to join."
+                
+                await processing_message.edit_text(success_message, reply_markup=keyboard, parse_mode='Markdown')
+                
+                # Send join button to target user
+                try:
+                    target_keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 Join Group", url=group_info['invite_link'])],
+                        [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{user_id}")]
+                    ])
+                    
+                    target_message = f"🎉 **New Connection from {user_profile['name']}!**\n\n"
+                    target_message += f"👤 **{user_profile['name']}**\n"
+                    target_message += f"🏢 **Role:** {user_profile['role']}\n"
+                    target_message += f"🚀 **Project:** {user_profile['project']}\n"
+                    target_message += f"💬 **Bio:** {user_profile['bio']}\n\n"
+                    target_message += f"A group has been created! Click below to join."
+                    
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=target_message,
+                        reply_markup=target_keyboard,
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"Sent group join link to user {target_user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send group join link to user {target_user_id}: {e}")
+                
+                return  # Successfully created group
+            else:
+                logger.error("Failed to create database connection")
+                raise Exception("Database connection creation failed")
+        
+        # Fallback if API fails
+        raise Exception("Telegram API group creation failed")
+        
+    except Exception as e:
+        logger.error(f"Group creation failed: {e}")
+        
+        # Fallback to connection without auto group
+        await processing_message.edit_text(
+            f"🎉 **Connected with {target_profile['name']}!**\n\n"
+            f"👤 **{target_profile['name']}**\n"
+            f"🏢 **Role:** {target_profile['role']}\n"
+            f"🚀 **Project:** {target_profile['project']}\n"
+            f"💬 **Bio:** {target_profile['bio']}\n\n"
+            f"❌ **Automatic group creation failed**\n\n"
+            f"Use /creategroup {target_user_id} to try creating a group manually."
+        )
+        
+        # Still notify the target user about the connection
+        try:
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=f"🎉 **New Connection from {user_profile['name']}!**\n\n"
+                     f"👤 **{user_profile['name']}**\n"
+                     f"🏢 **Role:** {user_profile['role']}\n"
+                     f"🚀 **Project:** {user_profile['project']}\n"
+                     f"💬 **Bio:** {user_profile['bio']}\n\n"
+                     f"You've been connected! Use /myconnections to see all your connections."
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify target user {target_user_id}: {e}")
 
 async def generate_qr_from_callback(query, context):
     """Generate QR code from callback"""
@@ -1550,6 +1713,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_themed_qr_menu(query, context)
         return
     
+    # elif query.data == "launch_webapp":
+    #     # Launch the web app
+    #     webapp_url = f"{WEBAPP_BASE_URL}/webapp/"
+    #     keyboard = InlineKeyboardMarkup([
+    #         [InlineKeyboardButton("🚀 Launch LinkUp App", web_app=WebAppInfo(url=webapp_url))]
+    #     ])
+    #     await query.edit_message_text(
+    #         "📱 **Launch LinkUp Web App**\n\n"
+    #         "Click the button below to open the modern LinkUp interface:",
+    #         reply_markup=keyboard,
+    #         parse_mode='Markdown'
+    #     )
+    #     return
+    
     elif query.data.startswith("themed_qr_"):
         # Handle themed QR generation
         theme = query.data.replace("themed_qr_", "")
@@ -1557,9 +1734,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     elif query.data.startswith("instant_group_"):
-        # Handle instant group creation from QR scan
+        # Legacy handling for instant group creation from QR scan
+        # We now create groups automatically when QR is scanned
         target_user_id = int(query.data.replace("instant_group_", ""))
-        await create_instant_group(query, context, target_user_id)
+        await query.edit_message_text(
+            "⚙️ **Process Updated!**\n\n"
+            "Groups are now created automatically when QR codes are scanned.\n"
+            "Please scan the QR code again to create your group."
+        )
         return
     
     elif query.data.startswith("view_profile_"):
@@ -1964,6 +2146,51 @@ async def shutdown_app(application):
     logger.info("Shutting down Telegram API client...")
     await close_telegram_api()
 
+# async def launch_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     """Launch the web app"""
+#     webapp_url = f"{WEBAPP_BASE_URL}/webapp/"
+    
+#     keyboard = InlineKeyboardMarkup([
+#         [InlineKeyboardButton("🚀 Launch LinkUp App", web_app=WebAppInfo(url=webapp_url))]
+#     ])
+    
+#     await update.message.reply_text(
+#         "📱 **LinkUp Web App**\n\n"
+#         "Click the button below to launch the LinkUp web app with a modern interface for:\n\n"
+#         "• Profile management\n"
+#         "• QR code generation\n"
+#         "• Connection tracking\n"
+#         "• Group creation\n\n"
+#         "The app will open directly within Telegram!",
+#         reply_markup=keyboard,
+#         parse_mode='Markdown'
+#     )
+
+# QR Code generation for webapp
+def generate_qr_code_image(tg_id, size=300):
+    """Generate QR code image for a given Telegram user ID - can be used by webapp API"""
+    try:
+        # Create QR code with Telegram deep link format
+        qr_data = f"user_{tg_id}"
+        
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        
+        # Create QR code image
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        
+        return qr_image
+    except Exception as e:
+        logger.error(f"QR code generation failed: {e}")
+        return None
+
 def main():
     """Main function"""
     token = os.getenv("TOKEN")
@@ -1988,6 +2215,7 @@ def main():
     app.add_handler(CommandHandler("connect", handle_connect))
     app.add_handler(CommandHandler("myconnections", list_connections))
     app.add_handler(CommandHandler("creategroup", create_group))
+    # app.add_handler(CommandHandler("app", launch_webapp))  # Add command to launch web app
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
