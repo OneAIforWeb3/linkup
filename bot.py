@@ -589,9 +589,16 @@ async def create_connection_in_database(user_id: int, target_user_id: int, group
         db_user_id = user_profile['user_id']
         db_target_user_id = target_profile['user_id']
         
+        # Use placeholder only when no link is provided
+        final_link = group_link
+        if final_link is None:
+            final_link = "https://t.me/linkup_temp"
+            
+        logger.info(f"Creating connection with link: {final_link}")
+        
         # Create group in database
         result = api_client.create_group(
-            group_link=group_link or "https://t.me/linkup_temp",
+            group_link=final_link,
             user1_id=db_user_id,
             user2_id=db_target_user_id,
             event_name=event_name
@@ -610,10 +617,22 @@ async def create_connection_in_database(user_id: int, target_user_id: int, group
 async def check_connection_exists(user_id: int, target_user_id: int) -> bool:
     """Check if connection exists between two users"""
     try:
+        # First check connections in the normal direction
         connections = await get_user_connections(user_id)
         for connection in connections:
             if connection['tg_id'] == target_user_id:
+                logger.info(f"Found existing connection between {user_id} and {target_user_id}")
                 return True
+        
+        # Also check connections in the reverse direction
+        # This is important because connections are bidirectional
+        target_connections = await get_user_connections(target_user_id)
+        for connection in target_connections:
+            if connection['tg_id'] == user_id:
+                logger.info(f"Found existing reverse connection between {target_user_id} and {user_id}")
+                return True
+                
+        logger.info(f"No existing connection found between {user_id} and {target_user_id}")
         return False
     except Exception as e:
         logger.error(f"Error checking connection existence: {e}")
@@ -1047,12 +1066,17 @@ async def show_group_creation_option(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text("❌ Error retrieving user profiles. Please try again.")
         return
     
-    # Create instant connection in database instead of in-memory
-    connection_created = await create_connection_in_database(user_id, target_user_id)
+    # Store connection info in context for later retrieval when creating group
+    if 'temp_connections' not in context.bot_data:
+        context.bot_data['temp_connections'] = {}
     
-    if not connection_created:
-        await update.message.reply_text("❌ Failed to create connection. Please try again.")
-        return
+    # Store the connection info using both users as the key
+    connection_key = f"{min(user_id, target_user_id)}_{max(user_id, target_user_id)}"
+    context.bot_data['temp_connections'][connection_key] = {
+        'user_id': user_id,
+        'target_user_id': target_user_id,
+        'created_at': datetime.now().isoformat()
+    }
     
     # Show group creation option
     keyboard = InlineKeyboardMarkup([
@@ -1255,6 +1279,17 @@ async def create_instant_group(query, context, target_user_id):
         await query.edit_message_text("❌ Error retrieving user profiles. Please try again.")
         return
     
+    # Check if connection already exists
+    connection_exists = await check_connection_exists(user_id, target_user_id)
+    if connection_exists:
+        # User already has a connection, inform them
+        await query.edit_message_text(
+            f"✅ **Already Connected!**\n\n"
+            f"You're already connected with {target_profile['name']}.\n"
+            f"Use /myconnections to see all your connections."
+        )
+        return
+    
     # Create group name: Project (UserA) <-> Project (UserB)
     group_title = f"{user_profile['project']} <-> {target_profile['project']}"
     group_description = f"LinkUp networking group: {user_profile['name']} & {target_profile['name']}"
@@ -1262,24 +1297,39 @@ async def create_instant_group(query, context, target_user_id):
     await query.edit_message_text("🏗️ **Creating your networking group...** ⏳")
     
     try:
-        # Use Telegram API to create group
+        # Use Telegram API to create empty group with invite link
         if telegram_api.is_initialized:
+            # Get user database IDs for database connection
+            db_user_profile = await get_user_profile(user_id)
+            db_target_profile = await get_user_profile(target_user_id)
+            
+            if not db_user_profile or not db_target_profile:
+                logger.error(f"Could not find database profiles for users {user_id} and {target_user_id}")
+                raise Exception("Failed to retrieve database profiles")
+            
+            db_user_id = db_user_profile['user_id']
+            db_target_user_id = db_target_profile['user_id']
+            
+            # Create empty group and get invite link
             group_info = await telegram_api.create_group(
                 group_title=group_title,
-                user_ids=[target_user_id,user_id],
                 description=group_description
             )
             
-            if group_info:
-                # Group created successfully - Store in database
-                connection_updated = await create_connection_in_database(
-                    user_id, target_user_id, 
-                    group_link=group_info['invite_link'],
-                    event_name="QR Code Connection"
-                )
-                
-                if connection_updated:
-                    logger.info(f"Stored instant group in database for users {user_id} and {target_user_id}")
+            if not group_info or not group_info.get('invite_link'):
+                logger.error("Failed to create Telegram group or get invite link")
+                raise Exception("Telegram group creation failed")
+            
+            # Now create the connection in database with real group link
+            result = api_client.create_group(
+                group_link=group_info['invite_link'],
+                user1_id=db_user_id,
+                user2_id=db_target_user_id,
+                event_name="QR Code Connection"
+            )
+            
+            if result and 'group_id' in result:
+                logger.info(f"Created connection group {result['group_id']} between users {user_id} and {target_user_id}")
                 
                 # Send response with group info
                 success_message = f"🎉 **Group Created Successfully!**\n\n"
@@ -1311,6 +1361,9 @@ async def create_instant_group(query, context, target_user_id):
                     logger.error(f"Failed to send bot invite to user {target_user_id}: {e}")
                 
                 return  # Successfully created group
+            else:
+                logger.error("Failed to create database connection")
+                raise Exception("Database connection creation failed")
         
         # Fallback if API fails
         raise Exception("Telegram API group creation failed")
