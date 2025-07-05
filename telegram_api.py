@@ -72,14 +72,14 @@ class TelegramAPIClient:
     
     async def create_group(self, 
                           group_title: str, 
-                          user_ids: List[int], 
+                          user_ids: List[int] = None, 
                           description: str = None) -> Optional[Dict[str, Any]]:
         """
-        Create a new Telegram group and add users
+        Create a new Telegram group and generate invite link
         
         Args:
             group_title: Title for the group
-            user_ids: List of user IDs to add to the group
+            user_ids: List of user IDs (optional, not added directly)
             description: Optional group description
             
         Returns:
@@ -90,10 +90,10 @@ class TelegramAPIClient:
             return None
             
         try:
-            # Create the group
+            # Create an empty group (only with the bot)
             chat = await self.app.create_group(
                 title=group_title,
-                users=user_ids
+                users=[]  # Empty list to create group without other users
             )
             
             logger.info(f"Created group: {chat.title} (ID: {chat.id})")
@@ -112,7 +112,7 @@ class TelegramAPIClient:
                 "group_id": chat.id,
                 "group_title": chat.title,
                 "invite_link": invite_link,
-                "member_count": len(user_ids) + 1,  # +1 for the creator
+                "member_count": 1,  # Just the creator
                 "created_at": datetime.now().isoformat()
             }
             

@@ -1266,7 +1266,7 @@ async def create_instant_group(query, context, target_user_id):
         if telegram_api.is_initialized:
             group_info = await telegram_api.create_group(
                 group_title=group_title,
-                user_ids=[target_user_id],
+                user_ids=[target_user_id,user_id],
                 description=group_description
             )
             
@@ -1558,7 +1558,7 @@ Your personal networking assistant for events.
             if telegram_api.is_initialized:
                 group_info = await telegram_api.create_group(
                     group_title=group_title,
-                    user_ids=[target_user_id],
+                    user_ids=[target_user_id,user_id],
                     description=group_description
                 )
                 
