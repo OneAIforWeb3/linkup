@@ -7,12 +7,12 @@ A networking assistant for event attendees
 import os
 import logging
 from datetime import datetime
-# from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 from telegram_api import telegram_api, initialize_telegram_api, close_telegram_api
 from apis.api_client import api_client
+from apis.qr_utils import generate_qr_code_image, create_card_style_qr
 import qrcode
 import io
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -23,8 +23,8 @@ from typing import List, Dict
 
 load_dotenv()
 
-# # Get base URL for the web app from environment variable or use default
-# WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "https://your-api-domain.com")
+# Get base URL for the web app from environment variable or use default
+WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "https://your-api-domain.com")
 
 def get_full_name(user):
     """Get full name from user object, fallback to first name or user ID"""
@@ -923,7 +923,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
          InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
         [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
-         InlineKeyboardButton("👥 My Connections", callback_data="view_connections")]
+         InlineKeyboardButton("👥 My Connections", callback_data="view_connections")],
+        [InlineKeyboardButton("🚀 Launch Web App", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}"))]
     ])
     
     welcome_text = f"""
@@ -1015,7 +1016,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /myconnections - View all your connections\n"
             "• /creategroup - Create a group chat with your connections\n"
             "• /scan - Scan a QR code from image (reply to an image)\n"
-            "• /connect [user_id] - Connect with a user by ID",
+            "• /connect [user_id] - Connect with a user by ID\n\n"
+            "📱 **Web App**:\n"
+            "• /app - Launch the LinkUp web app",
             parse_mode='Markdown'
         )
 
@@ -1546,155 +1549,6 @@ async def generate_qr_from_callback(query, context):
             "Please try the /myqr command instead."
         )
 
-def create_card_style_qr(qr_data, username, size=(1200, 675), qr_color=(0, 0, 0)):
-    """Create a card-style QR code with ethglobal.png as background
-    
-    Args:
-        qr_data: Data to encode in QR
-        username: Telegram username to display
-        size: Card size in pixels (width, height) - default 1200x675 (16:9 aspect ratio)
-        qr_color: RGB tuple for QR code color (default: ETH Cannes blue)
-        
-    Returns:
-        PIL.Image: Card image with QR code
-    """
-    try:
-        # Load background image
-        bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ethglobal.jpg')
-        try:
-            bg_image = Image.open(bg_path)
-            # Resize background to fit card size while maintaining aspect ratio
-            bg_image = bg_image.resize(size, Image.Resampling.LANCZOS)
-        except Exception as e:
-            logging.error(f"Failed to load background image: {e}")
-            # Create fallback gradient background
-            bg_image = Image.new('RGB', size, (14, 165, 233))
-            draw = ImageDraw.Draw(bg_image)
-            for y in range(size[1]):
-                ratio = y / size[1]
-                r = int(14 * (1 - ratio) + 42 * ratio)
-                g = int(165 * (1 - ratio) + 206 * ratio)
-                b = int(233 * (1 - ratio) + 204 * ratio)
-                draw.line([(0, y), (size[0], y)], fill=(r, g, b))
-        
-        # Create QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,  # High error correction for better design
-            box_size=10,
-            border=0,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        
-        # Create QR image with specified color
-        qr_img = qr.make_image(fill_color=qr_color, back_color='white')
-        
-        # Calculate QR code size and position (centered)
-        qr_size = min(size) // 3  # QR takes about 1/3 of the shortest dimension
-        qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-        
-        # Create a new blank image with the background
-        card = Image.new('RGBA', size, (0, 0, 0, 0))
-        if bg_image.mode != 'RGBA':
-            bg_image = bg_image.convert('RGBA')
-        card.paste(bg_image, (0, 0))
-        
-        # Calculate QR container size
-        qr_container_width = int(qr_size * 1.5)
-        qr_container_height = int(qr_size * 1.8)  # Taller to accommodate username below
-        
-        # Calculate QR container position (centered)
-        container_x = (size[0] - qr_container_width) // 2
-        container_y = (size[1] - qr_container_height) // 2
-        
-        # Create translucent gray container with blur effect simulation
-        # Since PIL doesn't have a direct blur effect for regions, we'll simulate it with a semi-transparent overlay
-        container = Image.new('RGBA', (qr_container_width, qr_container_height), (255, 255, 255, 128))
-        
-        # Add a subtle border to the container
-        container_border = Image.new('RGBA', (qr_container_width, qr_container_height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(container_border)
-        draw.rectangle([0, 0, qr_container_width-1, qr_container_height-1], outline=(255, 255, 255, 180), width=2)
-        
-        # Add some noise to simulate blur
-        for _ in range(100):
-            x = random.randint(0, qr_container_width-1)
-            y = random.randint(0, qr_container_height-1)
-            radius = random.randint(1, 3)
-            alpha = random.randint(5, 20)
-            draw.ellipse([x-radius, y-radius, x+radius, y+radius], fill=(255, 255, 255, alpha))
-        
-        # Composite the container with border
-        container = Image.alpha_composite(container, container_border)
-        
-        # Paste container onto card
-        card.paste(container, (container_x, container_y), container)
-        
-        # Calculate QR position within container (centered horizontally, higher vertically)
-        qr_x = container_x + (qr_container_width - qr_size) // 2
-        qr_y = container_y + (qr_container_height - qr_size) // 3  # Place higher to leave room for text
-        
-        # Paste QR code onto card
-        card.paste(qr_img, (qr_x, qr_y))
-        
-        # Add username text below QR code
-        draw = ImageDraw.Draw(card)
-        
-        # Try to load fonts
-        font_paths = [
-            "/System/Library/Fonts/Helvetica.ttc",  # macOS
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
-            "arial.ttf",  # Windows
-        ]
-        
-        username_font = None
-        for font_path in font_paths:
-            try:
-                username_font = ImageFont.truetype(font_path, 60)
-                break
-            except (OSError, IOError):
-                continue
-        
-        # Fallback to default if no fonts found
-        if username_font is None:
-            username_font = ImageFont.load_default()
-        
-        # Format the username
-        if username:
-            username_text = f"@{username}" if not username.startswith('@') else username
-            
-            # Get text width
-            bbox = draw.textbbox((0, 0), username_text, font=username_font)
-            username_width = bbox[2] - bbox[0]
-            
-            # Position username at bottom of container
-            username_x = container_x + (qr_container_width - username_width) // 2
-            username_y = qr_y + qr_size + 20
-            
-            # Add text with the same color as QR code for consistency
-            draw.text(
-                (username_x, username_y), 
-                username_text, 
-                fill=qr_color, 
-                font=username_font
-            )
-        
-        return card.convert('RGB')
-        
-    except Exception as e:
-        logging.error(f"Card QR generation failed: {e}")
-        return None
-
-# QR color options
-QR_COLORS = {
-    'blue': (0, 155, 208),  # ETH Cannes blue
-    'purple': (147, 51, 234),  # Vibrant purple
-    'orange': (251, 146, 60),  # Vibrant orange
-    'green': (34, 197, 94),  # Vibrant green
-    'red': (239, 68, 68),  # Vibrant red
-}
-
 async def show_themed_qr_menu(query, context):
     """Show themed QR code menu"""
     keyboard = InlineKeyboardMarkup([
@@ -1859,7 +1713,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
              InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
             [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
-             InlineKeyboardButton("👥 My Connections", callback_data="view_connections")]
+             InlineKeyboardButton("👥 My Connections", callback_data="view_connections")],
+            [InlineKeyboardButton("🚀 Launch Web App", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/react-webapp/build/"))]
         ])
         
         welcome_text = f"""
@@ -2270,50 +2125,34 @@ async def shutdown_app(application):
     logger.info("Shutting down Telegram API client...")
     await close_telegram_api()
 
-# async def launch_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     """Launch the web app"""
-#     webapp_url = f"{WEBAPP_BASE_URL}/webapp/"
+async def launch_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Launch the web app"""
+    # Use the React-based Telegram Mini App
+    # Make sure to use a publicly accessible URL
+    webapp_url = os.getenv("WEBAPP_BASE_URL", "https://your-domain.com")
     
-#     keyboard = InlineKeyboardMarkup([
-#         [InlineKeyboardButton("🚀 Launch LinkUp App", web_app=WebAppInfo(url=webapp_url))]
-#     ])
+    # Remove any trailing slashes
+    if webapp_url.endswith('/'):
+        webapp_url = webapp_url[:-1]
     
-#     await update.message.reply_text(
-#         "📱 **LinkUp Web App**\n\n"
-#         "Click the button below to launch the LinkUp web app with a modern interface for:\n\n"
-#         "• Profile management\n"
-#         "• QR code generation\n"
-#         "• Connection tracking\n"
-#         "• Group creation\n\n"
-#         "The app will open directly within Telegram!",
-#         reply_markup=keyboard,
-#         parse_mode='Markdown'
-#     )
-
-# QR Code generation for webapp
-def generate_qr_code_image(tg_id, size=300):
-    """Generate QR code image for a given Telegram user ID - can be used by webapp API"""
-    try:
-        # Create QR code with Telegram deep link format
-        qr_data = f"user_{tg_id}"
-        
-        # Create QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        
-        # Create QR code image
-        qr_image = qr.make_image(fill_color="black", back_color="white")
-        
-        return qr_image
-    except Exception as e:
-        logger.error(f"QR code generation failed: {e}")
-        return None
+    # Log the URL being used
+    logging.info(f"Launching webapp with URL: {webapp_url}")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Launch LinkUp App", web_app=WebAppInfo(url=webapp_url))]
+    ])
+    
+    await update.message.reply_text(
+        "📱 **LinkUp Web App**\n\n"
+        "Click the button below to launch the LinkUp web app with a modern interface for:\n\n"
+        "• Profile management\n"
+        "• QR code generation\n"
+        "• Connection tracking\n"
+        "• Group creation\n\n"
+        "The app will open directly within Telegram!",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
 
 async def update_profile_from_callback(query, context):
     """Handle profile update from callback"""
@@ -2711,7 +2550,7 @@ def main():
     app.add_handler(CommandHandler("connect", handle_connect))
     app.add_handler(CommandHandler("myconnections", list_connections))
     app.add_handler(CommandHandler("creategroup", create_group))
-    # app.add_handler(CommandHandler("app", launch_webapp))  # Add command to launch web app
+    app.add_handler(CommandHandler("app", launch_webapp))  # Add command to launch web app
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     

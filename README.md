@@ -231,3 +231,44 @@ EventCRM features intelligent group creation with multiple modes:
 - **Working solutions**: Uses real Telegram deep links (`tg://user?id=`) for direct messaging
 - **User-friendly fallbacks**: Provides multiple working alternatives for group creation
 - **No fake parameters**: Eliminates non-existent API calls that cause blank screens 
+
+## Telegram Mini App
+
+LinkUp includes a modern web interface that runs directly within Telegram:
+
+- **Modern UI**: Beautiful, responsive design that adapts to Telegram themes
+- **Enhanced Features**: Advanced profile management, connection tracking, and more
+- **Seamless Integration**: Access via the "Launch App" button in the bot
+
+To launch the mini app:
+1. Send `/start` or `/app` to the bot
+2. Click on the "🚀 Launch App" button
+
+## Installation
+
+1. Clone this repository
+2. Copy `env.example` to `.env` and configure your settings
+3. Install dependencies: `pip install -r requirements.txt`
+4. Run the bot: `python bot.py`
+
+## Documentation
+
+See the `docs` folder for detailed documentation:
+
+- [QUICK_START.md](docs/QUICK_START.md) - Getting started guide
+- [TELEGRAM_API_SETUP.md](docs/TELEGRAM_API_SETUP.md) - Setting up Telegram API
+- [DATABASE_INTEGRATION.md](docs/DATABASE_INTEGRATION.md) - Database integration
+- [ROFL_DEPLOYMENT_CHECKLIST.md](docs/ROFL_DEPLOYMENT_CHECKLIST.md) - Deployment guide
+
+## Dependencies
+
+- Python 3.7+
+- python-telegram-bot
+- Pillow
+- qrcode
+- Telethon (for group creation)
+- Flask (for API)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

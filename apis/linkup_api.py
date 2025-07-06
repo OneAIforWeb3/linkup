@@ -1,17 +1,24 @@
 import os
+import sys
+
+# Add the project root to the Python path to allow importing modules from there
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import mysql.connector
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask_cors import CORS
 from mysql.connector import Error
 
-from constants import CHECK_USER_EXISTS_QUERY, INSERT_USER_QUERY, UPDATE_USER_QUERY, DELETE_USER_QUERY, \
+from apis.constants import CHECK_USER_EXISTS_QUERY, INSERT_USER_QUERY, UPDATE_USER_QUERY, DELETE_USER_QUERY, \
     CREATE_GROUP_QUERY, INSERT_GROUP_PARTICIPANTS_QUERY, GET_GROUP_DETAILS_QUERY, GET_PARTICIPANT_QUERY, \
     GET_USERS_DETAILS_QUERY, GET_USER_GROUPS_QUERY
+from apis.qr_utils import generate_qr_code_image, create_card_style_qr
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 
 def get_db_connection():
@@ -297,7 +304,7 @@ def get_user_groups():
 def serve_webapp():
     """Serve the main webapp index.html"""
     try:
-        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'webapp')
+        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'react-webapp', 'build')
         return send_from_directory(webapp_dir, 'index.html')
     except Exception as e:
         return jsonify({'error': f'Webapp not found: {str(e)}'}), 404
@@ -306,7 +313,7 @@ def serve_webapp():
 def serve_webapp_assets(filename):
     """Serve webapp static assets (CSS, JS, images)"""
     try:
-        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'webapp')
+        webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'react-webapp', 'build')
         return send_from_directory(webapp_dir, filename)
     except Exception as e:
         return jsonify({'error': f'Asset not found: {str(e)}'}), 404
@@ -314,23 +321,38 @@ def serve_webapp_assets(filename):
 # API endpoints for the webapp
 @app.route('/api/generate-qr', methods=['GET'])
 def generate_qr_api():
-    """Generate QR code for webapp"""
-    from bot import generate_qr_code_image
+    """Generate card-style QR code for webapp"""
     import io
-    
     tg_id = request.args.get('tg_id')
     if not tg_id:
         return jsonify({'error': 'Missing tg_id parameter'}), 400
-    
     try:
-        # Generate QR code image
-        qr_img = generate_qr_code_image(tg_id)
-        
-        # Convert to bytes
+        # Look up user in DB
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT username, display_name FROM users WHERE tg_id = %s", (tg_id,))
+        user = cursor.fetchone()
+        if user:
+            username = user['username'] or user['display_name'] or f'user_{tg_id}'
+        else:
+            username = f'user_{tg_id}'
+        if cursor: cursor.close()
+        if conn: conn.close()
+        # Generate card-style QR
+        qr_img = create_card_style_qr(f"user_{tg_id}", username)
+        if qr_img is not None:
+            width, height = qr_img.size
+            crop_margin = int(width * 0.18)
+            left = crop_margin
+            right = width - crop_margin
+            qr_img = qr_img.crop((left, 0, right, height))
+        if qr_img is None:
+            # fallback to basic QR
+            from apis.qr_utils import generate_qr_code_image
+            qr_img = generate_qr_code_image(tg_id)
         img_buffer = io.BytesIO()
         qr_img.save(img_buffer, format='PNG')
         img_buffer.seek(0)
-        
         return send_file(img_buffer, mimetype='image/png')
     except Exception as e:
         return jsonify({'error': f'Failed to generate QR: {str(e)}'}), 500

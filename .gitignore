@@ -5,3 +5,8 @@ __pycache__/
 .pytest_cache/
 sessions*.orc
 rofl.yaml
+
+node_modules/
+.vercel
+.cursor
+sessions/
