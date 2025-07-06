@@ -21,6 +21,7 @@ deployments:
     network: testnet
     paratime: sapphire
     admin: linkup
+    oci_repository: rofl.sh/c7200a2d-85ca-4212-bbdb-48f3b684f3f7:1751782353
     trust_root:
       height: 27376514
       hash: e079c2222eb5e39ee179f82776446bd9a1664edf8c1a949d69feb9c4197e04c1
@@ -30,7 +31,9 @@ deployments:
           tcb_validity_period: 30
           min_tcb_evaluation_data_number: 18
           tdx: {}
-      enclaves: []
+      enclaves:
+        - id: 9Ewsa/Od5HC1IkGT1cfLcH0sr/edUjfCpMRAAtS5hhcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+        - id: sVCSFPIvmuNsgEvchXAmRgA7+/+qx0gIHb26Rg2czHUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
       endorsements:
         - any: {}
       fees: endorsing_node
@@ -54,3 +57,8 @@ deployments:
         value: pGJwa1ggo3xrF4ZdSirdmehgzsizMI3F9hQhBlyM5cGLVFympXxkbmFtZVgeFJUpRfZL6WNWcCA3Ll5808OSZYUpjlnha50EltGfZW5vbmNlT0O6G1itSh7ZLjzQFYPavWV2YWx1ZVghSFfdZFvXuvhYOm/Q1Wn+V3SRJu/c5CE4bBVFlMKVosRQ
       - name: MYSQL_DATABASE
         value: pGJwa1ggYeYBuKE/zZKnyOVothBmT+l1LFsFH6XfCe1/yBR1XRNkbmFtZVgeKoBGP/qqs3pVU+ts6R9jq9IcOLGOu++cAwNl1Mc1ZW5vbmNlT8TlPJv7NBl3KVBbmsGQHGV2YWx1ZVY89BHRuurTH1bt7NHp3jlZGImWHLQS
+    machines:
+      default:
+        provider: oasis1qp2ens0hsp7gh23wajxa4hpetkdek3swyyulyrmz
+        offer: playground_short
+        id: 000000000000017d
