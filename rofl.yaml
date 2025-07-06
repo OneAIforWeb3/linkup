@@ -54,3 +54,10 @@ deployments:
         value: pGJwa1ggyUKecoiM/UOzQXYuG7sqVZBuc1eKFRrFHhmkNw6PJnpkbmFtZVge0DWhS4Nc5PcW46N/RAkuJAdR4AVpOUD7fROXg9rEZW5vbmNlT2BtFt9g83k+KNniW7OwSWV2YWx1ZVghl98mOfaNCgLJvHlOPfrVrBYj/l4wUqmwwaT/qgrBDZ5R
       - name: MYSQL_DATABASE
         value: pGJwa1ggwbCW4O1q21aKf+2ntaOUP9/yrQ1OueiwW4UO34I1x0xkbmFtZVgeLD2SRQ0tc4brSHco2jLlPsuzvRFMgiQg8WFZV4YnZW5vbmNlT9DrEdTmJ8NDUT3T7oIZ1GV2YWx1ZVaWCTfSflV1rQ5oyjtY5yxWyNE7SuO2
+      - name: TOKEN
+        value: pGJwa1gg4umlE6YL27h4Jmhtxxt+3+5JpHDjXZYLVr7ZUVjRYylkbmFtZVWsEpZNpI/ARaUFzMHeZOQ43VB7fEplbm9uY2VPTQdCnLW0QuQyiMbIK2cyZXZhbHVlWD81EAhxP+D7AK6zZimeUgaXLnclS87ndlqzn+iHhOQ9nOG4DwKNyMvwgv1KN1hBdiz4vFfU/156IlP8TqwR2HM=
+    machines:
+      default:
+        provider: oasis1qp2ens0hsp7gh23wajxa4hpetkdek3swyyulyrmz
+        offer: playground_short
+        id: "0000000000000180"
