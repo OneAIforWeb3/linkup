@@ -14,6 +14,7 @@ COPY bot.py .
 COPY telegram_api.py .
 COPY apis/ ./apis/
 COPY sessions/ ./sessions/
+COPY ethglobal.jpg .
 
 # Create sessions directory for Telegram API
 RUN mkdir -p ./sessions

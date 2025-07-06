@@ -965,8 +965,8 @@ async def setup_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Profile setup"""
     await update.message.reply_text(
         "Send your profile in format:\n"
-        "`Name | Role | Project | Bio`\n\n"
-        "Example: `John Doe | VC | TechFund | Looking for AI startups`",
+        "`Name, Role, Project, Bio`\n\n"
+        "Example: `John Doe, VC, TechFund, Looking for AI startups`",
         parse_mode='Markdown'
     )
     context.user_data['awaiting_profile'] = True
@@ -976,7 +976,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('awaiting_profile'):
         # Handle profile update
         text = update.message.text.strip()
-        parts = [part.strip() for part in text.split('|')]
+        parts = [part.strip() for part in text.split(',')]
         
         if len(parts) == 4:
             name, role, project, bio = parts
@@ -1020,9 +1020,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(
                 "❌ Invalid format. Please use:\n\n"
-                "**Name | Role | Project | Bio**\n\n"
+                "**Name, Role, Project, Bio**\n\n"
                 "Example:\n"
-                "`John Doe | VC | TechFund | Looking for AI startups`",
+                "`John Doe, VC, TechFund, Looking for AI startups`",
                 parse_mode='Markdown'
             )
     else:
@@ -2403,8 +2403,8 @@ async def update_profile_from_callback(query, context):
     await query.edit_message_text(
         "✏️ **Update Your Profile**\n\n"
         "Send your profile in format:\n"
-        "`Name | Role | Project | Bio`\n\n"
-        "Example: John Doe | VC | TechFund | Looking for AI startups",
+        "`Name, Role, Project, Bio`\n\n"
+        "Example: John Doe, VC, TechFund, Looking for AI startups",
         parse_mode='Markdown'
     )
     context.user_data['awaiting_profile'] = True
