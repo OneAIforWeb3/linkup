@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-LinkUp Telegram Bot - Running on ROFL
+WeMeetAI Telegram Bot - Running on ROFL
 A networking assistant for event attendees
 """
 
 import os
 import logging
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ReplyKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 from telegram_api import telegram_api, initialize_telegram_api, close_telegram_api
@@ -20,6 +20,8 @@ import textwrap
 import random
 import math
 from typing import List, Dict
+import asyncio
+import re
 
 load_dotenv()
 
@@ -441,7 +443,7 @@ def create_themed_qr(qr_data, username, event_name=None, theme='ethcc', size=100
         canvas.paste(bg, (0, 0))
         
         # Calculate QR code size and position with better spacing
-        qr_size = int(size * 0.4)  # QR takes 40% of canvas (reduced for better spacing)
+        qr_size = int(size * 0.4)  # QR takes 40% of the shortest dimension
         qr_x = (size - qr_size) // 2
         
         # Dynamic positioning based on whether event name exists
@@ -535,8 +537,8 @@ def create_themed_qr(qr_data, username, event_name=None, theme='ethcc', size=100
         username_width = bbox[2] - bbox[0]
         username_x = (size - username_width) // 2
         
-        # Position username directly below the QR code
-        username_y = qr_y + qr_bg_size + 20  # 20px padding between QR and username
+        # Position username just below the QR code, with small padding
+        username_y = qr_y + qr_size + 18  # 18px padding below QR code
         
         # Enhanced username text shadow for better readability
         for offset in range(4, 0, -1):
@@ -637,7 +639,7 @@ def db_user_to_profile(db_user):
         'username': db_user['username'] or 'unknown',
         'role': db_user['role'] or 'Not specified',
         'project': db_user['project_name'] or 'Unknown Project',
-        'bio': db_user['description'] or 'LinkUp User',
+        'bio': db_user['description'] or 'WeMeetAI User',
         'telegram_id': db_user['tg_id'],
         'profile_image_url': db_user.get('profile_image_url'),
         'created_at': created_at_str
@@ -683,6 +685,7 @@ async def create_or_update_user_profile(tg_id, profile_data):
         else:
             # Create new user
             create_data = profile_to_db_user(profile_data, tg_id)
+            logger.info(f"Creating user with data: {create_data}")
             result = api_client.create_user(**create_data)
             return result is not None and 'user_id' in result
     except Exception as e:
@@ -729,7 +732,7 @@ async def get_user_connections(user_id: int) -> List[Dict]:
         logger.error(f"Error getting user connections from database: {e}")
         return []
 
-async def create_connection_in_database(user_id: int, target_user_id: int, group_link: str = None, event_name: str = None) -> bool:
+async def create_connection_in_database(user_id: int, target_user_id: int, group_link: str = None, event_name: str = "ETH Cannes") -> bool:
     """Create a connection by storing a group in the database"""
     try:
         # Get user database IDs
@@ -792,10 +795,33 @@ async def check_connection_exists(user_id: int, target_user_id: int) -> bool:
         logger.error(f"Error checking connection existence: {e}")
         return False
 
+def escape_markdown(text):
+    """Escape Telegram Markdown special characters in a string."""
+    return re.sub(r'([_\*\[\]()~`>#+\-=|{}.!])', r'\\\1', str(text))
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Welcome message and handle deep link parameters"""
     user_name = get_full_name(update.effective_user)
     user_id = update.effective_user.id
+    safe_user_name = escape_markdown(user_name)
+    # Get Telegram profile photo URL if available
+    profile_image_url = None
+    if update.effective_user:
+        # Telegram User.photo is a UserProfilePhotos object, but not always available
+        # If using python-telegram-bot v20+, you need to fetch it via get_user_profile_photos
+        try:
+            photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+            logger.info(f"Profile photos response: total_count={photos.total_count}, photos={photos.photos}")
+            if photos.total_count > 0:
+                # Store only the file_id instead of the full URL for security
+                profile_image_url = photos.photos[0][0].file_id
+                logger.info(f"Successfully fetched profile photo file_id: {profile_image_url}")
+            else:
+                logger.info(f"No profile photo found for user {user_id}")
+        except Exception as e:
+            logger.warning(f"Could not fetch profile photo: {e}")
+    
+    logger.info(f"Profile image file_id for user {user_id}: {profile_image_url}")
     
     # Handle deep link parameters (from QR code scan)
     if context.args and len(context.args) > 0:
@@ -822,7 +848,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         'username': username,
                         'role': 'Not specified',
                         'project': f"{user_name}'s Project",
-                        'bio': 'LinkUp User'
+                        'bio': 'WeMeetAI User',
+                        'profile_image_url': profile_image_url
                     }
                     success = await create_or_update_user_profile(user_id, basic_profile)
                     if success:
@@ -839,7 +866,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.warning(f"Target user {target_user_id} not found in profiles")
                     await processing_message.edit_text(
                         "❌ **User Not Found**\n\n"
-                        "The person whose QR code you scanned hasn't set up their LinkUp profile yet.\n\n"
+                        "The person whose QR code you scanned hasn't set up their WeMeetAI profile yet.\n\n"
                         "Please ask them to:\n"
                         "1. Start the bot: /start\n"
                         "2. Set up their profile: /profile\n"
@@ -857,7 +884,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Update the processing message with user info while we check for connection
                 await processing_message.edit_text(
                     f"🔍 **Processing Connection...**\n\n"
-                    f"Connecting with {target_profile['name']}...\n"
+                    f"Connecting with {escape_markdown(target_profile['name'])}...\n"
                     f"Creating your networking group...",
                     parse_mode='Markdown'
                 )
@@ -880,18 +907,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
                         ])
                         
-                        message = f"✅ **Already Connected with {target_profile['name']}!**\n\n"
-                        message += f"👤 **{target_profile['name']}**\n"
-                        message += f"🏢 **Role:** {target_profile['role']}\n"
-                        message += f"🚀 **Project:** {target_profile['project']}\n"
-                        message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+                        message = f"✅ **Already Connected with {escape_markdown(target_profile['name'])}!**\n\n"
+                        message += f"👤 **{escape_markdown(target_profile['name'])}**\n"
+                        message += f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+                        message += f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+                        message += f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
                         message += f"You already have a group chat. Click below to go to your existing group!"
                         
                         await processing_message.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
                     else:
                         # Connected but no group link found
                         await processing_message.edit_text(
-                            f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+                            f"✅ **Already Connected with {escape_markdown(target_profile['name'])}!**\n\n"
                             f"You're already connected, but no group chat was found.\n"
                             f"Use /creategroup {target_user_id} to create a new group chat."
                         )
@@ -906,7 +933,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Error processing QR scan parameter: {e}")
                 await update.message.reply_text(
                     "❌ **Invalid QR Code**\n\n"
-                    "The QR code you scanned doesn't seem to be a valid LinkUp QR code.\n\n"
+                    "The QR code you scanned doesn't seem to be a valid WeMeetAI QR code.\n\n"
                     "Please make sure you're scanning a QR code generated by this bot."
                 )
                 return
@@ -920,42 +947,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Normal welcome message with enhanced options
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
-         InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
+        [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr")],
         [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
          InlineKeyboardButton("👥 My Connections", callback_data="view_connections")],
         [InlineKeyboardButton("🚀 Launch Web App", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}"))]
     ])
-    
-    welcome_text = f"""
-🎉 Welcome to LinkUp, {user_name}!
 
-Your personal networking assistant for events.
+    welcome_text = (
+        f"🎉 Welcome to WeMeetAI, {escape_markdown(user_name)}!\n\n"
+        "Your personal networking assistant for events.\n\n"
 
-**Available Commands:**
 
-📋 **Profile Management**:
-• /profile - Set up or update your profile
-• /myqr - Generate a basic QR code to share
-• /themedqr - Create a stylish themed QR code
-
-👥 **Networking**:
-• /myconnections - View all your connections
-• /creategroup - Create a group chat with your connections
-• /scan - Scan a QR code from image (reply to an image)
-• /connect [user_id] - Connect with a user by ID
-
-📱 **Quick Actions:**
-Use the buttons below for fast access to common features!
-    """
+        "Use the buttons below for fast access to common features!"
+    )
     await update.message.reply_text(welcome_text, reply_markup=keyboard, parse_mode='Markdown')
 
 async def setup_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Profile setup"""
     await update.message.reply_text(
         "Send your profile in format:\n"
-        "Name | Role | Project | Bio\n\n"
-        "Example: John Doe | VC | TechFund | Looking for AI startups"
+        "`Name | Role | Project | Bio`\n\n"
+        "Example: `John Doe | VC | TechFund | Looking for AI startups`",
+        parse_mode='Markdown'
     )
     context.user_data['awaiting_profile'] = True
 
@@ -969,24 +982,33 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(parts) == 4:
             name, role, project, bio = parts
             user_id = update.effective_user.id
-            
+            # Try to get Telegram profile photo URL
+            profile_image_url = None
+            if update.effective_user:
+                try:
+                    photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+                    if photos.total_count > 0:
+                        file = await context.bot.get_file(photos.photos[0][0].file_id)
+                        profile_image_url = file.file_path
+                except Exception as e:
+                    logger.warning(f"Could not fetch profile photo: {e}")
             profile_data = {
                 'name': name,
                 'username': update.effective_user.username or name.replace(' ', '').lower(),
                 'role': role,
                 'project': project,
-                'bio': bio
+                'bio': bio,
+                'profile_image_url': profile_image_url
             }
-            
             success = await create_or_update_user_profile(user_id, profile_data)
             
             if success:
                 await update.message.reply_text(
                     f"✅ **Profile Updated!**\n\n"
-                    f"👤 **Name:** {name}\n"
-                    f"🏢 **Role:** {role}\n"
-                    f"🚀 **Project:** {project}\n"
-                    f"💬 **Bio:** {bio}\n\n"
+                    f"👤 **Name:** {escape_markdown(name)}\n"
+                    f"🏢 **Role:** {escape_markdown(role)}\n"
+                    f"🚀 **Project:** {escape_markdown(project)}\n"
+                    f"💬 **Bio:** {escape_markdown(bio)}\n\n"
                     f"Perfect! You can now generate QR codes and start networking.",
                     parse_mode='Markdown'
                 )
@@ -1005,22 +1027,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='Markdown'
             )
     else:
-        # Handle other text messages
-        await update.message.reply_text(
-            "👋 Hi! Use /start to see available options, or try:\n\n"
-            "📋 **Profile Management**:\n"
-            "• /profile - Set up or update your profile\n"
-            "• /myqr - Generate a basic QR code to share\n"
-            "• /themedqr - Create a stylish themed QR code\n\n"
-            "👥 **Networking**:\n"
-            "• /myconnections - View all your connections\n"
-            "• /creategroup - Create a group chat with your connections\n"
-            "• /scan - Scan a QR code from image (reply to an image)\n"
-            "• /connect [user_id] - Connect with a user by ID\n\n"
-            "📱 **Web App**:\n"
-            "• /app - Launch the LinkUp web app",
-            parse_mode='Markdown'
-        )
+        # If user presses the persistent Start button, show available commands
+        if update.message.text.strip().lower() == "start":
+            menu_text = """
+🎉 Welcome to WeMeetAI!
+
+Your personal networking assistant for events.
+
+📱 *Quick Actions:*
+Use the buttons below for fast access to common features!
+            """
+            await update.message.reply_text(menu_text, parse_mode='Markdown')
+            return
+        # ... existing code ...
 
 async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Generate QR code (works with or without full profile)"""
@@ -1036,7 +1055,8 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User'
+            'bio': 'WeMeetAI User',
+            'profile_image_url': profile_image_url
         }
         success = await create_or_update_user_profile(user_id, basic_profile)
         if success:
@@ -1067,8 +1087,8 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             caption = f"📱 **Your ETHCC QR Card**\n\n"
             caption += f"👤 **Your Profile:**\n"
-            caption += f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-            caption += f"{profile['bio']}\n\n"
+            caption += f"{escape_markdown(profile['name'])} | {escape_markdown(profile['role'])} | {escape_markdown(profile['project'])}\n"
+            caption += f"{escape_markdown(profile['bio'])}\n\n"
             caption += f"💡 **Tip:** Show this QR card at events to connect with others!"
             
             await update.message.reply_photo(
@@ -1101,9 +1121,9 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 photo=bio,
                 caption=f"📱 **Your QR Code**\n\n"
                        f"👤 **Your Profile:**\n"
-                       f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-                       f"{profile['bio']}\n\n"
-                       f"💡 **Want a better QR?** Try `/themedqr` for our stylish ETHCC card!",
+                       f"{escape_markdown(profile['name'])} | {escape_markdown(profile['role'])} | {escape_markdown(profile['project'])}\n"
+                       f"{escape_markdown(profile['bio'])}\n\n"
+                       f"💡 **Your QR code is ready to share!**",
                 parse_mode='Markdown'
             )
         
@@ -1114,8 +1134,8 @@ async def generate_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📱 Your QR Code:\n\n"
             f"`{qr_data}`\n\n"
             f"👤 Your Profile:\n"
-            f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-            f"{profile['bio']}", 
+            f"{escape_markdown(profile['name'])} | {escape_markdown(profile['role'])} | {escape_markdown(profile['project'])}\n"
+            f"{escape_markdown(profile['bio'])}", 
             parse_mode='Markdown'
         )
 
@@ -1133,7 +1153,8 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User'
+            'bio': 'WeMeetAI User',
+            'profile_image_url': profile_image_url
         }
         success = await create_or_update_user_profile(user_id, basic_profile)
         if success:
@@ -1144,7 +1165,7 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Parse command arguments
     event_name = None
-    theme = 'blockchain'  # Default theme
+    theme = 'ethcc'  # Default theme
     
     if context.args:
         for arg in context.args:
@@ -1159,7 +1180,7 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(
             f"❌ **Invalid theme:** `{theme}`\n\n"
             f"**Available themes:** {available_themes}\n\n"
-            f"**Example:** `/themedqr event:ETHCC theme:ethcc`",
+            f"**Use /myqr for ETHCC-themed QR codes**",
             parse_mode='Markdown'
         )
         return
@@ -1189,16 +1210,13 @@ async def generate_themed_qr(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
             caption = f"🎨 **Your Themed QR Code**\n\n"
             if event_name:
-                caption += f"🎪 **Event:** {event_name.upper()}\n"
-            caption += f"🎯 **Theme:** {theme.title()}\n"
-            caption += f"👤 **Profile:** {profile['name']}\n"
-            caption += f"🏢 **Role:** {profile['role']}\n"
-            caption += f"🚀 **Project:** {profile['project']}\n\n"
+                caption += f"🎪 **Event:** {escape_markdown(event_name.upper())}\n"
+            caption += f"🎯 **Theme:** {escape_markdown(theme.title())}\n"
+            caption += f"👤 **Profile:** {escape_markdown(profile['name'])}\n"
+            caption += f"🏢 **Role:** {escape_markdown(profile['role'])}\n"
+            caption += f"🚀 **Project:** {escape_markdown(profile['project'])}\n\n"
             caption += f"💡 **Show this personalized QR code at events to stand out!**\n\n"
-            caption += f"**Try other themes:**\n"
-            caption += f"• `/themedqr theme:ethcc` - ETHCC official\n"
-            caption += f"• `/themedqr theme:ethereum` - Crypto style\n"
-            caption += f"• `/themedqr theme:ocean` - Ocean vibes"
+            caption += f"🎨 **ETHCC Official Theme**"
             
             await update.message.reply_photo(
                 photo=bio,
@@ -1286,7 +1304,7 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Update the processing message with user info while we check for connection
     await processing_message.edit_text(
         f"🔍 **Processing Connection...**\n\n"
-        f"Connecting with {target_profile['name']}...\n"
+        f"Connecting with {escape_markdown(target_profile['name'])}...\n"
         f"Creating your networking group...",
         parse_mode='Markdown'
     )
@@ -1309,18 +1327,18 @@ async def handle_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
             ])
             
-            message = f"✅ **Already Connected with {target_profile['name']}!**\n\n"
-            message += f"👤 **{target_profile['name']}**\n"
-            message += f"🏢 **Role:** {target_profile['role']}\n"
-            message += f"🚀 **Project:** {target_profile['project']}\n"
-            message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            message = f"✅ **Already Connected with {escape_markdown(target_profile['name'])}!**\n\n"
+            message += f"👤 **{escape_markdown(target_profile['name'])}**\n"
+            message += f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+            message += f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+            message += f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
             message += f"You already have a group chat. Click below to go to your existing group!"
             
             await processing_message.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
         else:
             # Connected but no group link found
             await processing_message.edit_text(
-                f"✅ **Already Connected with {target_profile['name']}!**\n\n"
+                f"✅ **Already Connected with {escape_markdown(target_profile['name'])}!**\n\n"
                 f"You're already connected, but no group chat was found.\n"
                 f"Use /creategroup {target_user_id} to create a new group chat."
             )
@@ -1338,9 +1356,14 @@ async def create_and_show_group_with_message(processing_message, context, user_i
         await processing_message.edit_text("❌ Error retrieving user profiles. Please try again.")
         return
     
+    # Limit each name to 22 characters, add '...' if longer
+    def short_name(name):
+        return name if len(name) <= 22 else name[:22] + '...'
+    user_name_short = short_name(user_profile['name'])
+    target_name_short = short_name(target_profile['name'])
     # Create group title and description
-    group_title = f"🤝 {user_profile['name']} ↔ {target_profile['name']}"
-    group_description = f"LinkUp networking group for {user_profile['name']} ({user_profile['role']}) and {target_profile['name']} ({target_profile['role']})"
+    group_title = f"🤝 {user_name_short} ↔ {target_name_short}"
+    group_description = f"WeMeetAI networking group for {user_profile['name']} ({user_profile['role']}) and {target_profile['name']} ({target_profile['role']})"
     
     try:
         # Create empty group with Telegram API
@@ -1364,7 +1387,7 @@ async def create_and_show_group_with_message(processing_message, context, user_i
                 group_link=group_info['invite_link'],
                 user1_id=db_user_id,
                 user2_id=db_target_user_id,
-                event_name="QR Code Connection"
+                event_name="ETH Cannes"
             )
             
             if result and 'group_id' in result:
@@ -1376,14 +1399,21 @@ async def create_and_show_group_with_message(processing_message, context, user_i
                     [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
                 ])
                 
-                success_message = f"🎉 **Connected with {target_profile['name']}!**\n\n"
-                success_message += f"👤 **{target_profile['name']}**\n"
-                success_message += f"🏢 **Role:** {target_profile['role']}\n"
-                success_message += f"🚀 **Project:** {target_profile['project']}\n"
-                success_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
-                success_message += f"Your group has been created! Click below to join."
+                success_message = f"🎉 **Group Created Successfully!**\n\n"
+                success_message += f"**Group:** {escape_markdown(group_info['group_title'])}\n"
+                success_message += f"**Members:** {group_info['member_count']}\n\n"
+                success_message += f"**Instructions:**\n"
+                success_message += f"1. Click the button below to join\n"
+                success_message += f"2. {escape_markdown(target_profile['name'])} will receive their invite link\n"
+                success_message += f"3. Start networking! 🚀\n\n"
+                success_message += f"💡 **This group is private and secure**"
                 
-                await processing_message.edit_text(success_message, reply_markup=keyboard, parse_mode='Markdown')
+                await context.bot.send_message(
+                    chat_id=processing_message.chat_id,
+                    text=success_message,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
                 
                 # Send join button to target user
                 try:
@@ -1392,11 +1422,11 @@ async def create_and_show_group_with_message(processing_message, context, user_i
                         [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{user_id}")]
                     ])
                     
-                    target_message = f"🎉 **New Connection from {user_profile['name']}!**\n\n"
-                    target_message += f"👤 **{user_profile['name']}**\n"
-                    target_message += f"🏢 **Role:** {user_profile['role']}\n"
-                    target_message += f"🚀 **Project:** {user_profile['project']}\n"
-                    target_message += f"💬 **Bio:** {user_profile['bio']}\n\n"
+                    target_message = f"🎉 **New Connection from {escape_markdown(user_profile['name'])}!**\n\n"
+                    target_message += f"👤 **{escape_markdown(user_profile['name'])}**\n"
+                    target_message += f"🏢 **Role:** {escape_markdown(user_profile['role'])}\n"
+                    target_message += f"🚀 **Project:** {escape_markdown(user_profile['project'])}\n"
+                    target_message += f"💬 **Bio:** {escape_markdown(user_profile['bio'])}\n\n"
                     target_message += f"A group has been created! Click below to join."
                     
                     await context.bot.send_message(
@@ -1422,11 +1452,11 @@ async def create_and_show_group_with_message(processing_message, context, user_i
         
         # Fallback to connection without auto group
         await processing_message.edit_text(
-            f"🎉 **Connected with {target_profile['name']}!**\n\n"
-            f"👤 **{target_profile['name']}**\n"
-            f"🏢 **Role:** {target_profile['role']}\n"
-            f"🚀 **Project:** {target_profile['project']}\n"
-            f"💬 **Bio:** {target_profile['bio']}\n\n"
+            f"🎉 **Connected with {escape_markdown(target_profile['name'])}!**\n\n"
+            f"👤 **{escape_markdown(target_profile['name'])}**\n"
+            f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+            f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+            f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
             f"❌ **Automatic group creation failed**\n\n"
             f"Use /creategroup {target_user_id} to try creating a group manually."
         )
@@ -1435,31 +1465,52 @@ async def create_and_show_group_with_message(processing_message, context, user_i
         try:
             await context.bot.send_message(
                 chat_id=target_user_id,
-                text=f"🎉 **New Connection from {user_profile['name']}!**\n\n"
-                     f"👤 **{user_profile['name']}**\n"
-                     f"🏢 **Role:** {user_profile['role']}\n"
-                     f"🚀 **Project:** {user_profile['project']}\n"
-                     f"💬 **Bio:** {user_profile['bio']}\n\n"
+                text=f"🎉 **New Connection from {escape_markdown(user_profile['name'])}!**\n\n"
+                     f"👤 **{escape_markdown(user_profile['name'])}**\n"
+                     f"🏢 **Role:** {escape_markdown(user_profile['role'])}\n"
+                     f"🚀 **Project:** {escape_markdown(user_profile['project'])}\n"
+                     f"💬 **Bio:** {escape_markdown(user_profile['bio'])}\n\n"
                      f"You've been connected! Use /myconnections to see all your connections."
             )
         except Exception as e:
             logger.error(f"Failed to notify target user {target_user_id}: {e}")
 
 async def generate_qr_from_callback(query, context):
-    """Generate QR code from callback"""
+    """Generate QR code from callback query"""
     user_id = query.from_user.id
     user_name = get_full_name(query.from_user)
     
-    # Create basic profile if user doesn't have one
+    # Get user profile
     profile = await get_user_profile(user_id)
+    
     if not profile:
+        # Create basic profile if user doesn't exist
         username = query.from_user.username or user_name.replace(' ', '').lower()
+        
+        # Get Telegram profile photo URL if available
+        profile_image_url = None
+        if query.from_user:
+            try:
+                photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+                logger.info(f"Profile photos response: total_count={photos.total_count}, photos={photos.photos}")
+                if photos.total_count > 0:
+                    # Store only the file_id instead of the full URL for security
+                    profile_image_url = photos.photos[0][0].file_id
+                    logger.info(f"Successfully fetched profile photo file_id: {profile_image_url}")
+                else:
+                    logger.info(f"No profile photo found for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Could not fetch profile photo: {e}")
+        
+        logger.info(f"Profile image file_id for user {user_id}: {profile_image_url}")
+        
         basic_profile = {
             'name': user_name,
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User'
+            'bio': 'WeMeetAI User',
+            'profile_image_url': profile_image_url
         }
         success = await create_or_update_user_profile(user_id, basic_profile)
         if success:
@@ -1493,8 +1544,8 @@ async def generate_qr_from_callback(query, context):
             
             caption = f"📱 **Your ETHCC QR Card**\n\n"
             caption += f"👤 **Your Profile:**\n"
-            caption += f"{profile['name']} | {profile['role']} | {profile['project']}\n"
-            caption += f"{profile['bio']}\n\n"
+            caption += f"{escape_markdown(profile['name'])} | {escape_markdown(profile['role'])} | {escape_markdown(profile['project'])}\n"
+            caption += f"{escape_markdown(profile['bio'])}\n\n"
             caption += f"💡 **Tip:** Show this QR card at events to connect with others!"
             
             # Send as new message to preserve quality
@@ -1506,7 +1557,7 @@ async def generate_qr_from_callback(query, context):
             )
             
             # Update the original message to show success
-            await query.edit_message_text("✅ **Your QR card has been generated!** Check your messages.")
+            await query.edit_message_text("✅ **Your QR card has been generated!** Check your messages.", parse_mode='Markdown')
             
         else:
             # Fallback to basic QR if card generation fails
@@ -1540,7 +1591,7 @@ async def generate_qr_from_callback(query, context):
             )
             
             # Update original message
-            await query.edit_message_text("✅ **Your QR code has been generated!** Check your messages.")
+            await query.edit_message_text("✅ **Your QR code has been generated!** Check your messages.", parse_mode='Markdown')
             
     except Exception as e:
         logger.error(f"QR code generation from callback failed: {e}")
@@ -1585,11 +1636,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await generate_qr_from_callback(query, context)
         return
     
-    # Handle themed QR code menu
-    elif query.data == "themed_qr_menu":
-        await show_themed_qr_menu(query, context)
-        return
-    
     # Handle QR color selection
     elif query.data.startswith("qr_color_"):
         color_name = query.data.replace("qr_color_", "")
@@ -1607,10 +1653,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         connections = await get_user_connections(user_id)
         
         if not connections:
-            await query.edit_message_text(
-                "📭 **No connections yet**\n\n"
-                "Scan QR codes at events to connect with others!\n\n"
-                "Generate your own QR code with /myqr and share it.",
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="📭 **No connections yet**\n\n"
+                     "Scan QR codes at events to connect with others!\n\n"
+                     "Generate your own QR code with /myqr and share it.",
                 parse_mode='Markdown',
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("📱 Get My QR", callback_data="generate_qr"),
@@ -1620,38 +1667,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # Build connections message
-        message = "🤝 **Your Connections:**\n\n"
-        connection_buttons = []
-        
+        connection_list = "🤝 *Your Connections:*\n\n"
         for i, connection in enumerate(connections, 1):
-            message += f"{i}. **{connection['name']}**\n"
-            message += f"   🏢 {connection['role']} at {connection['project']}\n"
+            username = connection.get('username', '')
+            if username:
+                name_display = f"[{escape_markdown(connection['name'])}](https://t.me/{username})"
+            else:
+                name_display = f"{escape_markdown(connection['name'])}"
+            # Only show role if it's available and not empty
+            if connection.get('role') and connection['role'].strip() and connection['role'] != 'Not specified':
+                connection_list += f"{i}. {name_display} - {escape_markdown(connection['role'])} - {escape_markdown(connection['project'])}\n"
+            else:
+                connection_list += f"{i}. {name_display} - {escape_markdown(connection['project'])}\n"
+            # Show group chat as a Markdown link if available
+            if connection.get('group_link'):
+                group_link = connection['group_link']
+                connection_list += f"   👥 [Group Chat]({group_link})\n"
             if connection.get('event_name'):
-                message += f"   📍 Event: {connection['event_name']}\n"
-            message += "\n"
-            
-            # Add button for this connection
-            connection_buttons.append([
-                InlineKeyboardButton(
-                    f"👤 {connection['name']}",
-                    callback_data=f"view_profile_{connection['tg_id']}"
-                )
-            ])
-        
-        # Add create group button if there are connections
-        connection_buttons.append([
-            InlineKeyboardButton("👥 Create Group", callback_data="create_group_menu")
-        ])
-        
-        # Add back button
-        connection_buttons.append([
-            InlineKeyboardButton("◀️ Back", callback_data="back_to_start")
-        ])
-        
-        await query.edit_message_text(
-            message,
-            reply_markup=InlineKeyboardMarkup(connection_buttons),
-            parse_mode='Markdown'
+                connection_list += f"   📍 Event: {escape_markdown(connection['event_name'])}\n"
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=connection_list,
+            parse_mode='Markdown',
+            disable_web_page_preview=True
         )
         return
         
@@ -1678,7 +1716,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         group_buttons = []
         for i, connection in enumerate(connections, 1):
-            message += f"{i}. **{connection['name']}** - {connection['role']}\n"
+            # Only show role if it's available and not empty
+            if connection.get('role') and connection['role'].strip() and connection['role'] != 'Not specified':
+                message += f"{i}. **{escape_markdown(connection['name'])}** - {escape_markdown(connection['role'])}\n"
+            else:
+                message += f"{i}. **{escape_markdown(connection['name'])}** - {escape_markdown(connection['project'])}\n"
             
             # Create button for each connection
             group_buttons.append([
@@ -1703,41 +1745,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("view_profile_"):
         # Handle profile viewing
         target_user_id = int(query.data.replace("view_profile_", ""))
-        await view_user_profile(query, context, target_user_id)
+        await view_user_profile(query, context, target_user_id, send_new_message=True)
         return
     
     elif query.data == "back_to_start":
         # Handle back to start menu
         user_name = get_full_name(query.from_user)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr"),
-             InlineKeyboardButton("🎨 Themed QR", callback_data="themed_qr_menu")],
+            [InlineKeyboardButton("📱 My QR Code", callback_data="generate_qr")],
             [InlineKeyboardButton("✏️ Update Profile", callback_data="update_profile"),
              InlineKeyboardButton("👥 My Connections", callback_data="view_connections")],
             [InlineKeyboardButton("🚀 Launch Web App", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/react-webapp/build/"))]
         ])
         
-        welcome_text = f"""
-🎉 Welcome to LinkUp, {user_name}!
+        welcome_text = (
+            f"🎉 Welcome to WeMeetAI, {escape_markdown(user_name)}!\n\n"
+            "Your personal networking assistant for events.\n\n"
+ 
 
-Your personal networking assistant for events.
-
-**Available Commands:**
-
-📋 **Profile Management**:
-• /profile - Set up or update your profile
-• /myqr - Generate a basic QR code to share
-• /themedqr - Create a stylish themed QR code
-
-👥 **Networking**:
-• /myconnections - View all your connections
-• /creategroup - Create a group chat with your connections
-• /scan - Scan a QR code from image (reply to an image)
-• /connect [user_id] - Connect with a user by ID
-
-📱 **Quick Actions:**
-Use the buttons below for fast access to common features!
-        """
+            "📱 *Quick Actions:*\n"
+            "Use the buttons below for fast access to common features!"
+        )
         await query.edit_message_text(welcome_text, reply_markup=keyboard, parse_mode='Markdown')
         return
         
@@ -1772,12 +1800,12 @@ Use the buttons below for fast access to common features!
                 if group_info:
                     # Group created successfully - Send invite links via BOT
                     success_message = f"🎉 **Group Created Successfully!**\n\n"
-                    success_message += f"**Group:** {group_info['group_title']}\n"
+                    success_message += f"**Group:** {escape_markdown(group_info['group_title'])}\n"
                     success_message += f"**Members:** {group_info['member_count']}\n"
                     success_message += f"**Invite Link:** {group_info['invite_link']}\n\n"
                     success_message += f"**Instructions:**\n"
                     success_message += f"1. Click the link above to join\n"
-                    success_message += f"2. {target_profile['name']} will receive their invite link\n"
+                    success_message += f"2. {escape_markdown(target_profile['name'])} will receive their invite link\n"
                     success_message += f"3. Start networking! 🚀\n\n"
                     success_message += f"💡 **This group is private and secure**"
                     
@@ -1797,10 +1825,15 @@ Use the buttons below for fast access to common features!
                             await context.bot.send_message(
                                 chat_id=target_user_id,
                                 text=f"🎉 **You've been invited to a networking group!**\n\n"
-                                     f"**Group:** {group_info['group_title']}\n"
-                                     f"**Created by:** {user_profile['name']} ({user_profile['role']})\n\n"
-                                     f"🔗 **Your Invite Link:** {group_info['invite_link']}\n\n"
-                                     f"Click the link to join and start networking! 🚀"
+                                     f"**Group:** {escape_markdown(group_info['group_title'])}\n"
+                                     f"**Created by:** {escape_markdown(user_profile['name'])} ({escape_markdown(user_profile['role'])})\n\n"
+                                     f"🔗 **Join here:** {group_info['invite_link']}\n\n"
+                                     f"💡 **About {escape_markdown(user_profile['name'])}:**\n"
+                                     f"🏢 Role: {escape_markdown(user_profile['role'])}\n"
+                                     f"🚀 Project: {escape_markdown(user_profile['project'])}\n"
+                                     f"💬 Bio: {escape_markdown(user_profile['bio'])}\n\n"
+                                     f"Click the link to join and start networking! 🚀\n\n"
+                                     f"💾 **This connection is saved in your WeMeetAI profile.**"
                             )
                         except Exception as bot_error:
                             logger.error(f"Failed to send bot message to user {target_user_id}: {bot_error}")
@@ -1887,10 +1920,39 @@ Use the buttons below for fast access to common features!
         
         await query.edit_message_text(contact_info)
         
+    elif query.data.startswith("join_group_"):
+        target_user_id = int(query.data.replace("join_group_", ""))
+        target_profile = await get_user_profile(target_user_id)
+        # Find group link for this connection
+        user_id = query.from_user.id
+        connections = await get_user_connections(user_id)
+        group_link = None
+        for connection in connections:
+            if connection['tg_id'] == target_user_id and connection.get('group_link'):
+                group_link = connection['group_link']
+                break
+        success_message = (
+            f"✅ **Group Joined Successfully!**\n\n"
+            f"You can now chat in your group with **{escape_markdown(target_profile['name'])}**.\n\n"
+            f"Click below to open the group."
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👥 View Group", url=group_link)],
+            [InlineKeyboardButton("📋 View Profile", callback_data=f"view_profile_{target_user_id}")]
+        ])
+        await query.message.reply_text(success_message, reply_markup=keyboard, parse_mode='Markdown', disable_web_page_preview=True)
+        return
+    
+    elif query.data.startswith("view_profile_"):
+        # Always send a new message for view_profile
+        target_user_id = int(query.data.replace("view_profile_", ""))
+        await view_user_profile(query, context, target_user_id, send_new_message=True)
+        return
+    
     else:
         # For any other callbacks, show instant connections message
         await query.edit_message_text(
-            "🚀 **LinkUp now uses instant connections!**\n\n"
+            "🚀 **WeMeetAI now uses instant connections!**\n\n"
             "Just scan QR codes or use /connect for immediate connections.\n"
             "No more waiting for approvals! 🎉"
         )
@@ -1906,14 +1968,27 @@ async def list_connections(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 No connections yet")
         return
     
-    connection_list = "🤝 Your Connections:\n\n"
+    connection_list = "🤝 **Your Connections:**\n\n"
     
     for i, connection in enumerate(connections, 1):
-        connection_list += f"{i}. {connection['name']} - {connection['role']} - {connection['project']}\n"
-        if connection['event_name']:
-            connection_list += f"   📍 Event: {connection['event_name']}\n"
-    
-    await update.message.reply_text(connection_list)
+        username = connection.get('username', '')
+        if username:
+            name_display = f"[{escape_markdown(connection['name'])}](https://t.me/{username})"
+        else:
+            name_display = f"{escape_markdown(connection['name'])}"
+        # Only show role if it's available and not empty
+        if connection.get('role') and connection['role'].strip() and connection['role'] != 'Not specified':
+            connection_list += f"{i}. {name_display} - {escape_markdown(connection['role'])} - {escape_markdown(connection['project'])}\n"
+        else:
+            connection_list += f"{i}. {name_display} - {escape_markdown(connection['project'])}\n"
+        # Show group chat as a Markdown link if available
+        if connection.get('group_link'):
+            group_link = connection['group_link']
+            connection_list += f"   👥 [Group Chat]({group_link})\n"
+        if connection.get('event_name'):
+            connection_list += f"   📍 Event: {escape_markdown(connection['event_name'])}\n"
+        connection_list += "\n"
+    await update.message.reply_text(connection_list, parse_mode='Markdown', disable_web_page_preview=True)
 
 async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Create a group with connections using Telegram API"""
@@ -1977,12 +2052,12 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 group_members.append(f"{connection['name']} ({connection['project']})")
                 break
     
-    group_name = f"LinkUp: {' & '.join(group_members[:3])}"
+    group_name = f"WeMeetAI: {' & '.join(group_members[:3])}"
     if len(group_members) > 3:
         group_name += f" + {len(group_members) - 3} others"
     
     # Create group description
-    group_description = f"LinkUp networking group created by {user_profile['name']}\n\n"
+    group_description = f"WeMeetAI networking group created by {user_profile['name']}\n\n"
     group_description += "Members:\n"
     group_description += f"• {user_profile['name']} - {user_profile['role']} at {user_profile['project']}\n"
     for target_tg_id in target_tg_ids:
@@ -2017,13 +2092,13 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     connection_updated = await create_connection_in_database(
                         user_id, target_tg_id, 
                         group_link=group_info['invite_link'],
-                        event_name="Group Chat"
+                        event_name="ETH Cannes"
                     )
                     if connection_updated:
                         logger.info(f"Updated connection with group link for users {user_id} and {target_tg_id}")
                 
                 success_message = f"🎉 **Group Created Successfully!**\n\n"
-                success_message += f"**Group:** {group_info['group_title']}\n"
+                success_message += f"**Group:** {escape_markdown(group_info['group_title'])}\n"
                 success_message += f"**Members:** {group_info['member_count']}\n"
                 success_message += f"**Invite Link:** {group_info['invite_link']}\n\n"
                 success_message += f"✅ All members have been notified and can join using the link above!\n\n"
@@ -2047,9 +2122,14 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             await context.bot.send_message(
                                 chat_id=target_tg_id,
                                 text=f"🎉 **Group Invitation**\n\n"
-                                     f"{user_profile['name']} created a group: **{group_info['group_title']}**\n\n"
+                                     f"{escape_markdown(user_profile['name'])} created a group: **{escape_markdown(group_info['group_title'])}**\n\n"
                                      f"🔗 **Join here:** {group_info['invite_link']}\n\n"
-                                     f"Click the link to join and start networking! 🚀"
+                                     f"💡 **About {escape_markdown(user_profile['name'])}:**\n"
+                                     f"🏢 Role: {escape_markdown(user_profile['role'])}\n"
+                                     f"🚀 Project: {escape_markdown(user_profile['project'])}\n"
+                                     f"💬 Bio: {escape_markdown(user_profile['bio'])}\n\n"
+                                     f"Click the link to join and start networking! 🚀\n\n"
+                                     f"💾 **This connection is saved in your WeMeetAI profile.**"
                             )
                         except Exception as bot_e:
                             logger.error(f"Failed to send bot message to user {target_tg_id}: {bot_e}")
@@ -2071,20 +2151,20 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Provide manual group creation instructions
     instructions = f"📝 **Manual Group Creation Instructions**\n\n"
-    instructions += f"**Suggested Group Name:** {group_name}\n\n"
+    instructions += f"**Suggested Group Name:** {escape_markdown(group_name)}\n\n"
     instructions += f"**To create the group manually:**\n"
     instructions += f"1. Create a new group in Telegram\n"
     instructions += f"2. Add these members:\n"
     
-    instructions += f"   • {user_profile['name']} (@{user_profile.get('username', f'UserID: {user_id}')})\n"
+    instructions += f"   • {escape_markdown(user_profile['name'])} (@{escape_markdown(user_profile.get('username', f'UserID: {user_id}'))})\n"
     for target_tg_id in target_tg_ids:
         for connection in connections:
             if connection['tg_id'] == target_tg_id:
                 username = connection.get('username', f'UserID: {target_tg_id}')
-                instructions += f"   • {connection['name']} (@{username})\n"
+                instructions += f"   • {escape_markdown(connection['name'])} (@{escape_markdown(username)})\n"
                 break
     
-    instructions += f"\n3. Set group name: {group_name}\n"
+    instructions += f"\n3. Set group name: {escape_markdown(group_name)}\n"
     instructions += f"4. Start networking! 🚀\n\n"
     instructions += f"💡 **Tip:** Copy this message and share it with all members!"
     
@@ -2096,8 +2176,8 @@ async def create_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=target_tg_id,
                 text=f"👥 **Group Invitation**\n\n"
-                     f"{user_profile['name']} wants to create a group:\n"
-                     f"**{group_name}**\n\n"
+                     f"{escape_markdown(user_profile['name'])} wants to create a group:\n"
+                     f"**{escape_markdown(group_name)}**\n\n"
                      f"You'll receive group creation instructions from them!"
             )
         except Exception as e:
@@ -2159,8 +2239,9 @@ async def update_profile_from_callback(query, context):
     await query.edit_message_text(
         "✏️ **Update Your Profile**\n\n"
         "Send your profile in format:\n"
-        "**Name | Role | Project | Bio**\n\n"
-        "Example: John Doe | VC | TechFund | Looking for AI startups"
+        "`Name | Role | Project | Bio`\n\n"
+        "Example: John Doe | VC | TechFund | Looking for AI startups",
+        parse_mode='Markdown'
     )
     context.user_data['awaiting_profile'] = True
 
@@ -2180,14 +2261,14 @@ async def create_instant_group(query, context, target_user_id):
         # User already has a connection, inform them
         await query.edit_message_text(
             f"✅ **Already Connected!**\n\n"
-            f"You're already connected with {target_profile['name']}.\n"
+            f"You're already connected with {escape_markdown(target_profile['name'])}.\n"
             f"Use /myconnections to see all your connections."
         )
         return
     
     # Create group name: Project (UserA) <-> Project (UserB)
     group_title = f"{user_profile['project']} <-> {target_profile['project']}"
-    group_description = f"LinkUp networking group: {user_profile['name']} & {target_profile['name']}"
+    group_description = f"WeMeetAI networking group: {user_profile['name']} & {target_profile['name']}"
     
     await query.edit_message_text("🏗️ **Creating your networking group...** ⏳")
     
@@ -2220,7 +2301,7 @@ async def create_instant_group(query, context, target_user_id):
                 group_link=group_info['invite_link'],
                 user1_id=db_user_id,
                 user2_id=db_target_user_id,
-                event_name="QR Code Connection"
+                event_name="ETH Cannes"
             )
             
             if result and 'group_id' in result:
@@ -2228,11 +2309,13 @@ async def create_instant_group(query, context, target_user_id):
                 
                 # Send response with group info
                 success_message = f"🎉 **Group Created Successfully!**\n\n"
-                success_message += f"**Group:** {group_info['group_title']}\n"
-                success_message += f"**Members:** {group_info['member_count']}\n"
-                success_message += f"🔗 **Join your group:**\n{group_info['invite_link']}\n\n"
-                success_message += f"✅ {target_profile['name']} will receive their invite link from the bot!\n\n"
-                success_message += f"💾 **Connection saved to database.**"
+                success_message += f"**Group:** {escape_markdown(group_info['group_title'])}\n"
+                success_message += f"**Members:** {group_info['member_count']}\n\n"
+                success_message += f"**Instructions:**\n"
+                success_message += f"1. Click the button below to join\n"
+                success_message += f"2. {escape_markdown(target_profile['name'])} will receive their invite link\n"
+                success_message += f"3. Start networking! 🚀\n\n"
+                success_message += f"💡 **This group is private and secure**"
                 
                 await query.edit_message_text(success_message)
                 
@@ -2241,15 +2324,15 @@ async def create_instant_group(query, context, target_user_id):
                     await context.bot.send_message(
                         chat_id=target_user_id,
                         text=f"🎉 **You've been invited to a networking group!**\n\n"
-                             f"**Group:** {group_info['group_title']}\n"
-                             f"**Created by:** {user_profile['name']} ({user_profile['role']})\n\n"
+                             f"**Group:** {escape_markdown(group_info['group_title'])}\n"
+                             f"**Created by:** {escape_markdown(user_profile['name'])} ({escape_markdown(user_profile['role'])})\n\n"
                              f"🔗 **Join here:** {group_info['invite_link']}\n\n"
-                             f"💡 **About {user_profile['name']}:**\n"
-                             f"🏢 Role: {user_profile['role']}\n"
-                             f"🚀 Project: {user_profile['project']}\n"
-                             f"💬 Bio: {user_profile['bio']}\n\n"
+                             f"💡 **About {escape_markdown(user_profile['name'])}:**\n"
+                             f"🏢 Role: {escape_markdown(user_profile['role'])}\n"
+                             f"🚀 Project: {escape_markdown(user_profile['project'])}\n"
+                             f"💬 Bio: {escape_markdown(user_profile['bio'])}\n\n"
                              f"Click the link to join and start networking! 🚀\n\n"
-                             f"💾 **This connection is saved in your LinkUp profile.**"
+                             f"💾 **This connection is saved in your WeMeetAI profile.**"
                     )
                     logger.info(f"Bot sent group invite to user {target_user_id}")
                 except Exception as e:
@@ -2279,7 +2362,7 @@ async def create_instant_group(query, context, target_user_id):
         
         await query.edit_message_text(fallback_message)
 
-async def view_user_profile(query, context, target_user_id):
+async def view_user_profile(query, context, target_user_id, send_new_message=False):
     """View user profile details"""
     target_profile = await get_user_profile(target_user_id)
     
@@ -2287,23 +2370,46 @@ async def view_user_profile(query, context, target_user_id):
         await query.edit_message_text("❌ User profile not found.")
         return
     
-    profile_message = f"👤 **Profile: {target_profile['name']}**\n\n"
-    profile_message += f"🏢 **Role:** {target_profile['role']}\n"
-    profile_message += f"🚀 **Project:** {target_profile['project']}\n"
-    profile_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+    # Get connection info to check for group link
+    user_id = query.from_user.id
+    connections = await get_user_connections(user_id)
+    group_link = None
+    for connection in connections:
+        if connection['tg_id'] == target_user_id and connection.get('group_link'):
+            group_link = connection['group_link']
+            break
+    
+    profile_message = f"👤 **Profile: {escape_markdown(target_profile['name'])}**\n\n"
+    
+    # Only show role if it's available and not empty
+    if target_profile.get('role') and target_profile['role'].strip() and target_profile['role'] != 'Not specified':
+        profile_message += f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+    
+    profile_message += f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+    profile_message += f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
+    
     profile_message += f"**Connected!** You can now message each other directly."
     
     # Add buttons for actions
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💬 Create Group Chat", callback_data=f"create_group_{target_user_id}")],
-        [InlineKeyboardButton("◀️ Back to Connections", callback_data="view_connections")]
-    ])
+    buttons = []
+    if group_link:
+        buttons.append([InlineKeyboardButton("🚀 View Group", url=group_link)])
+    buttons.append([InlineKeyboardButton("◀️ Back to Connections", callback_data="view_connections")])
+    keyboard = InlineKeyboardMarkup(buttons)
     
-    await query.edit_message_text(
-        profile_message, 
-        reply_markup=keyboard,
-        parse_mode='Markdown'
-    )
+    if send_new_message:
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=profile_message,
+            reply_markup=keyboard,
+            parse_mode='Markdown'
+        )
+    else:
+        await query.edit_message_text(
+            profile_message, 
+            reply_markup=keyboard,
+            parse_mode='Markdown'
+        )
 
 async def create_instant_connection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_user_id: int):
     """Create instant connection and group between two users"""
@@ -2317,7 +2423,7 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
         return
     
     # Create connection in database
-    connection_created = await create_connection_in_database(user_id, target_user_id, event_name="Direct Connection")
+    connection_created = await create_connection_in_database(user_id, target_user_id, event_name="ETH Cannes")
     
     if not connection_created:
         await update.message.reply_text("❌ Failed to create connection. Please try again.")
@@ -2334,10 +2440,10 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
         try:
             # Create an invite link approach - more reliable
             invite_link_message = f"🎉 **Instant Connection + Auto Group!**\n\n"
-            invite_link_message += f"**Connected with:** {target_profile['name']}\n"
-            invite_link_message += f"🏢 **Role:** {target_profile['role']}\n"
-            invite_link_message += f"🚀 **Project:** {target_profile['project']}\n"
-            invite_link_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            invite_link_message += f"**Connected with:** {escape_markdown(target_profile['name'])}\n"
+            invite_link_message += f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+            invite_link_message += f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+            invite_link_message += f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
             
             # Create a group by having the bot start a group conversation
             # This is a workaround since direct group creation has limitations
@@ -2359,10 +2465,10 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
             # Fallback to connection without auto group
             success_message = f"🎉 **Instant Connection Created!**\n\n"
             success_message += f"**You're now connected with:**\n"
-            success_message += f"👤 **{target_profile['name']}**\n"
-            success_message += f"🏢 **Role:** {target_profile['role']}\n"
-            success_message += f"🚀 **Project:** {target_profile['project']}\n"
-            success_message += f"💬 **Bio:** {target_profile['bio']}\n\n"
+            success_message += f"👤 **{escape_markdown(target_profile['name'])}**\n"
+            success_message += f"🏢 **Role:** {escape_markdown(target_profile['role'])}\n"
+            success_message += f"🚀 **Project:** {escape_markdown(target_profile['project'])}\n"
+            success_message += f"💬 **Bio:** {escape_markdown(target_profile['bio'])}\n\n"
             success_message += f"💡 **Next Steps:**\n"
             success_message += f"• You can now message each other directly\n"
             success_message += f"• Use /creategroup {target_user_id} to create a group\n"
@@ -2374,12 +2480,12 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
         # Notify the target user
         try:
             target_message = f"🎉 **New Connection!**\n\n"
-            target_message += f"**{user_profile['name']}** just connected with you!\n\n"
-            target_message += f"🏢 **Their Role:** {user_profile['role']}\n"
-            target_message += f"🚀 **Their Project:** {user_profile['project']}\n"
-            target_message += f"💬 **Their Bio:** {user_profile['bio']}\n\n"
+            target_message += f"**{escape_markdown(user_profile['name'])}** just connected with you!\n\n"
+            target_message += f"🏢 **Their Role:** {escape_markdown(user_profile['role'])}\n"
+            target_message += f"🚀 **Their Project:** {escape_markdown(user_profile['project'])}\n"
+            target_message += f"💬 **Their Bio:** {escape_markdown(user_profile['bio'])}\n\n"
             target_message += f"💡 **Start networking!** Use /myconnections to see all your connections.\n\n"
-            target_message += f"💾 **Connection saved to your LinkUp profile.**"
+            target_message += f"💾 **Connection saved to your WeMeetAI profile.**"
             
             await context.bot.send_message(
                 chat_id=target_user_id,
@@ -2394,7 +2500,7 @@ async def create_instant_connection(update: Update, context: ContextTypes.DEFAUL
         # Still created the connection in database, just inform user
         await update.message.reply_text(
             f"🎉 **Connection Created!**\n\n"
-            f"You're now connected with **{target_profile['name']}**!\n"
+            f"You're now connected with **{escape_markdown(target_profile['name'])}**!\n"
             f"Use /myconnections to see all your connections.\n\n"
             f"💾 **Connection saved to database.**"
         )
@@ -2424,7 +2530,7 @@ async def handle_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if connection_exists:
             await update.message.reply_text(
                 f"✅ **Already Connected!**\n\n"
-                f"You're already connected with {target_profile['name']}.\n"
+                f"You're already connected with {escape_markdown(target_profile['name'])}.\n"
                 f"Use /myconnections to see all your connections."
             )
             return
@@ -2449,7 +2555,8 @@ async def generate_qr_with_color(query, context, color_name):
             'username': username,
             'role': 'Not specified',
             'project': f"{user_name}'s Project",
-            'bio': 'LinkUp User'
+            'bio': 'WeMeetAI User',
+            'profile_image_url': profile_image_url
         }
         success = await create_or_update_user_profile(user_id, basic_profile)
         if success:
@@ -2512,6 +2619,18 @@ async def generate_qr_with_color(query, context, color_name):
             "Use /myqr for a basic QR code instead."
         )
 
+async def set_bot_commands(application):
+    commands = [
+        BotCommand("start", "Show main menu"),
+        BotCommand("update_profile", "Set up or update your profile"),
+        BotCommand("myqr", "Generate a basic QR code to share"),
+        BotCommand("myconnections", "View all your connections"),
+        # BotCommand("creategroup", "Create a group chat with your connections"),
+        # BotCommand("scan", "Scan a QR code from image"),
+        # BotCommand("connect", "Connect with a user by ID"),
+    ]
+    await application.bot.set_my_commands(commands)
+
 def main():
     """Main function"""
     token = os.getenv("TOKEN")
@@ -2541,20 +2660,23 @@ def main():
         .build()
     )
     
+    # Set bot commands for the small Menu button
+    asyncio.get_event_loop().run_until_complete(set_bot_commands(app))
+    
     # Add handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("profile", setup_profile))
+    app.add_handler(CommandHandler("update_profile", setup_profile))
     app.add_handler(CommandHandler("myqr", generate_qr))
-    app.add_handler(CommandHandler("themedqr", generate_themed_qr))
     app.add_handler(CommandHandler("scan", handle_scan))
     app.add_handler(CommandHandler("connect", handle_connect))
     app.add_handler(CommandHandler("myconnections", list_connections))
-    app.add_handler(CommandHandler("creategroup", create_group))
-    app.add_handler(CommandHandler("app", launch_webapp))  # Add command to launch web app
+    # app.add_handler(CommandHandler("creategroup", create_group))  # Comment out handler registration
+    # app.add_handler(CommandHandler("scan", handle_scan))  # Comment out handler registration
+    # app.add_handler(CommandHandler("connect", handle_connect))  # Comment out handler registration
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    logger.info("Starting LinkUp Bot with ETHCC Theme...")
+    logger.info("Starting WeMeetAI Bot with ETHCC Theme...")
     try:
         app.run_polling()
     except KeyboardInterrupt:
