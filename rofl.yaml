@@ -21,6 +21,7 @@ deployments:
     network: testnet
     paratime: sapphire
     admin: linkup
+    oci_repository: rofl.sh/7ece1d7a-f111-4da3-bbb3-155f081a1ee8:1751785073
     trust_root:
       height: 27376953
       hash: aa397d3973fb42c9ca7ba96614b76d78046a89c231acc9d7bfef542c0c8a5c6f
@@ -30,14 +31,14 @@ deployments:
           tcb_validity_period: 30
           min_tcb_evaluation_data_number: 18
           tdx: {}
-      enclaves: []
+      enclaves:
+        - id: crSWKKsBERfHElsYnC5fOEZL0AS1lqI3v8zY+dyXXJkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+        - id: +fQr0TxpM4ulcxrhN15b9hnVrw8Y8bnGnHhfZN38EjUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
       endorsements:
         - any: {}
       fees: endorsing_node
       max_expiration: 3
     secrets:
-      - name: TOKEN
-        value: pGJwa1gghNdFBhd0as+FXwO9vgFvlTW7ejNuvD+34nkn/PIoGxFkbmFtZVUl+6f/t/8duMdOgcl8IwIn0NK2yGJlbm9uY2VPfIFno2Xb4zTU84pX8b4MZXZhbHVlWD9sN8pE9I+ogcdsAkxQ0256pgoAhfOIEP1Ih1qXvdlKMaF72yYL8GoCzWPX+XnnPdieiMJbr7IXqCH1JLWKyOo=
       - name: TELEGRAM_API_ID
         value: pGJwa1gg3q0TV1gqiX0Ll/85RPH6kDREXwMh+aRJW6l6yGOWp0xkbmFtZVgfhdORk98VjayKF9DkWMrpSAwwK2dkRhvI9IJazAowsmVub25jZU+Prh/apWLn+F9N1p3dnBFldmFsdWVYGOl/GQ2uZlLa8253T2TBLmx0/NSD0qo6EQ==
       - name: TELEGRAM_API_HASH
