@@ -24,8 +24,8 @@ const MyQRPage = () => {
     <PageContainer>
       <Header>
         <NavItem className="active">All</NavItem>
-        <NavItem>Personal</NavItem>
-        <NavItem>Professional</NavItem>
+        {/* <NavItem>Personal</NavItem>
+        <NavItem>Professional</NavItem> */}
       </Header>
       <QRImageContainer>
         {qrCodeUrl ? (
