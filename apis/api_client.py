@@ -72,20 +72,28 @@ class LinkUpAPIClient:
             'profile_image_url': profile_image_url
         }
         
-        # Remove None values
-        data = {k: v for k, v in data.items() if v is not None}
+        # Keep None values for profile_image_url but remove other None values
+        # This allows explicit null values for profile_image_url
+        filtered_data = {}
+        for k, v in data.items():
+            if k == 'profile_image_url' or v is not None:
+                filtered_data[k] = v
         
-        return self._make_request('POST', '/create-user', data=data)
+        return self._make_request('POST', '/create-user', data=filtered_data)
     
     def update_user(self, user_id: int, **kwargs) -> Optional[Dict]:
         """Update user information"""
-        # Remove None values
-        data = {k: v for k, v in kwargs.items() if v is not None}
+        # Keep None values for profile_image_url but remove other None values
+        # This allows explicit null values for profile_image_url
+        filtered_data = {}
+        for k, v in kwargs.items():
+            if k == 'profile_image_url' or v is not None:
+                filtered_data[k] = v
         
-        if not data:
+        if not filtered_data:
             return None
             
-        return self._make_request('PUT', f'/update-user/{user_id}', data=data)
+        return self._make_request('PUT', f'/update-user/{user_id}', data=filtered_data)
     
     def delete_user(self, user_id: int) -> Optional[Dict]:
         """Delete a user"""
