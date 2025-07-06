@@ -17,48 +17,40 @@ artifacts:
     compose: compose.yaml
 deployments:
   default:
-    app_id: rofl1qqnnlg0p4963veyu5ukjqckqqhk6qt4z9y30djv7
+    app_id: rofl1qqvwf4tknl69g668s0hf66k5vnnx43jt45xcr5qa
     network: testnet
     paratime: sapphire
     admin: linkup
-    oci_repository: rofl.sh/c7200a2d-85ca-4212-bbdb-48f3b684f3f7:1751782353
     trust_root:
-      height: 27376514
-      hash: e079c2222eb5e39ee179f82776446bd9a1664edf8c1a949d69feb9c4197e04c1
+      height: 27376953
+      hash: aa397d3973fb42c9ca7ba96614b76d78046a89c231acc9d7bfef542c0c8a5c6f
     policy:
       quotes:
         pcs:
           tcb_validity_period: 30
           min_tcb_evaluation_data_number: 18
           tdx: {}
-      enclaves:
-        - id: 9Ewsa/Od5HC1IkGT1cfLcH0sr/edUjfCpMRAAtS5hhcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
-        - id: sVCSFPIvmuNsgEvchXAmRgA7+/+qx0gIHb26Rg2czHUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+      enclaves: []
       endorsements:
         - any: {}
       fees: endorsing_node
       max_expiration: 3
     secrets:
       - name: TOKEN
-        value: pGJwa1ggxMUf9PcXu3iO7Y23OcvyltJVWnLaVu0AJfTVwcwxwFVkbmFtZVUHkKHUvA9neBgN91IJ7KzQvSEbXexlbm9uY2VPp8thGygWKCsYnZXMWNH4ZXZhbHVlWD8LgLfF3PPwo/80O1zB1WNvsLVERN/kVZCj8y5/RCw+xtIAgOgltkn9SlDQzPGmoxoaZNOVxk0o3Zz59M/uykQ=
+        value: pGJwa1gghNdFBhd0as+FXwO9vgFvlTW7ejNuvD+34nkn/PIoGxFkbmFtZVUl+6f/t/8duMdOgcl8IwIn0NK2yGJlbm9uY2VPfIFno2Xb4zTU84pX8b4MZXZhbHVlWD9sN8pE9I+ogcdsAkxQ0256pgoAhfOIEP1Ih1qXvdlKMaF72yYL8GoCzWPX+XnnPdieiMJbr7IXqCH1JLWKyOo=
       - name: TELEGRAM_API_ID
-        value: pGJwa1gg6GBNYTMAnQ6xb8sd2DFN3sflQHbAZ8IYTi0KiRMI5XNkbmFtZVgfq1gXeGqf1epDfzvaTLb1uUbVYMs4DJZQ+jEc1vLOYGVub25jZU99Du4tiCNOpWDM9dfvLMpldmFsdWVYGLiCEuEZI2rkdFDiNDn0e6Tk6SyZyobygQ==
+        value: pGJwa1gg3q0TV1gqiX0Ll/85RPH6kDREXwMh+aRJW6l6yGOWp0xkbmFtZVgfhdORk98VjayKF9DkWMrpSAwwK2dkRhvI9IJazAowsmVub25jZU+Prh/apWLn+F9N1p3dnBFldmFsdWVYGOl/GQ2uZlLa8253T2TBLmx0/NSD0qo6EQ==
       - name: TELEGRAM_API_HASH
-        value: pGJwa1ggCmJ/bPluRBfZRdHBgwUgedsezsAXH9IG3rhgYKpkNxVkbmFtZVghYpuNp1aa2LwVEokodtWswCEvtDFKK1XdEkkocU+n/gYVZW5vbmNlT+j8eIaifRCw8LStkzygkmV2YWx1ZVgwFGrEoE4mIhJDYJEU9dypJf8y54tcP9YJ/yOOLFlSv944ZA1hP4XCZ8txGGjV+6hW
+        value: pGJwa1ggN5s7N5nts3kxM8wFtN+0LVv01C1zncVJjB7+3VS0bSJkbmFtZVghQ+GoniXJczk8KEEUyWKDOJ7hCopw+Zm6Jnhj9/zmpfMgZW5vbmNlTz1TYxAnL74FDgEnL3KB5mV2YWx1ZVgwmQJ3FzW0vLTBm7XMBv4Xy/BQFLkOUrV/9XLpgO2/IOnkxcEsrUjhGhgQVIhSqlvk
       - name: TELEGRAM_PHONE_NUMBER
-        value: pGJwa1gg/tRayH68z2lN9mUzs58nA4wx6m64QbzGwyutAUx7FDFkbmFtZVgl/9amJWlDl5Is81EeYF5AYmYWtf/9XGKEtiEPtEO4DKepRBmZL2Vub25jZU+r7djqe7fQIEYSfKsHysVldmFsdWVYHMbIDgtmeLRADiKrRGoBrE9tm4E0Nn5s5o9UWuc=
+        value: pGJwa1ggT2MvteEM7OA6lQo6PQ24Uc6tieKlVM8SXWuzziGDwHtkbmFtZVglCUpULmpl02v0EPwtARBLvFI8BfsXBkzQHI1GS7T4lJWBoeI2mGVub25jZU9bwvJg8sWYnid7Kb36AWJldmFsdWVYHMKJ5svQ89SDnqB2q/X+hkeIuAD1RHSBy0QsE0o=
       - name: MYSQL_HOST
-        value: pGJwa1ggca/E89/Dg2MQcnAEWmb2GUYhBBTB7UIv10wbDYEsZzZkbmFtZVgaeRRL0mGXB8RB9m3sH6OyIIbVjfdSov+W0Zhlbm9uY2VPVe8/5aQR50uEUPYACyAGZXZhbHVlWEw2IIceeXXipwifbvRj+fApvULc+CwzwtkoAmwY0mehRbnEhze9SQNERRn0MwvZAZcqrXvCNh4+hDu2KG45M7RcTYiwrBTYVTPQG2Q1
+        value: pGJwa1gg6zGmudDBVaMM8Kt6qY9NDy9rNqigku0oNIuR1ROu7y5kbmFtZVgaCsZR7sjbybcRSCG5LEp9bEoqTCpMhpPXIPNlbm9uY2VPjoGb5p3+Wrx8XI6aC1knZXZhbHVlWEyVxr+ZY4aVdjUg7fp/xTjFIT5TwxR7V1Ghh0yW/uvCQUGtnii/Gn+q3NVDg7t2wsgo4Cln2I3HNNNLln5jEybyj5GmDIGltqt4D9LK
       - name: MYSQL_PORT
-        value: pGJwa1ggDG4jpvehdwsiWiqLT+qSK5i1kjC9WsAbhyVghj6dkyhkbmFtZVgaPnopgzv7QefuLQsYKKzsahFKHEWACqoYvutlbm9uY2VP0B6WDsS+0XYFgRyaOAMtZXZhbHVlVGkT3Bo28qBVXg2HL6CNppi6boC0
+        value: pGJwa1ggN0rT32J5bOfwOVRkJUOD8rAJLNdLkLGzQdKIf3CAfHFkbmFtZVgauCX8hapVpWWL5zHxBFDvZv7Nd6RTbLjm+VVlbm9uY2VPvu5VVF9/OD6YC83vlcZ8ZXZhbHVlVP5J1uqasN0OhbgKFSYp14fQQewK
       - name: MYSQL_USER
-        value: pGJwa1ggIoDEs3gDmGUxhmTZGJIR+Tr2IjO3Zmnef1gQ4rWvlHlkbmFtZVgaC+MFL4pcl+EhKCIQ0WiSKJThza0tUvWaEd9lbm9uY2VP/B4goLTy0GgwgBKjJ9rHZXZhbHVlVp6jA9fr81foKi1ivSV/pYvNzdd69rM=
+        value: pGJwa1gguIoFO+yqTNOVp5Dq9vUvqU2YoYB8E7TuHBAD2F4hvCNkbmFtZVga1pEaIQuou0UHfi6z9pAsXknaZGM/cTcwa8Zlbm9uY2VPrJfykZe24qT/x9s435Q4ZXZhbHVlVm367XwAKvTj2YH44/EOsuzPP9+VCpM=
       - name: MYSQL_PASSWORD
-        value: pGJwa1ggo3xrF4ZdSirdmehgzsizMI3F9hQhBlyM5cGLVFympXxkbmFtZVgeFJUpRfZL6WNWcCA3Ll5808OSZYUpjlnha50EltGfZW5vbmNlT0O6G1itSh7ZLjzQFYPavWV2YWx1ZVghSFfdZFvXuvhYOm/Q1Wn+V3SRJu/c5CE4bBVFlMKVosRQ
+        value: pGJwa1ggyUKecoiM/UOzQXYuG7sqVZBuc1eKFRrFHhmkNw6PJnpkbmFtZVge0DWhS4Nc5PcW46N/RAkuJAdR4AVpOUD7fROXg9rEZW5vbmNlT2BtFt9g83k+KNniW7OwSWV2YWx1ZVghl98mOfaNCgLJvHlOPfrVrBYj/l4wUqmwwaT/qgrBDZ5R
       - name: MYSQL_DATABASE
-        value: pGJwa1ggYeYBuKE/zZKnyOVothBmT+l1LFsFH6XfCe1/yBR1XRNkbmFtZVgeKoBGP/qqs3pVU+ts6R9jq9IcOLGOu++cAwNl1Mc1ZW5vbmNlT8TlPJv7NBl3KVBbmsGQHGV2YWx1ZVY89BHRuurTH1bt7NHp3jlZGImWHLQS
-    machines:
-      default:
-        provider: oasis1qp2ens0hsp7gh23wajxa4hpetkdek3swyyulyrmz
-        offer: playground_short
-        id: 000000000000017d
+        value: pGJwa1ggwbCW4O1q21aKf+2ntaOUP9/yrQ1OueiwW4UO34I1x0xkbmFtZVgeLD2SRQ0tc4brSHco2jLlPsuzvRFMgiQg8WFZV4YnZW5vbmNlT9DrEdTmJ8NDUT3T7oIZ1GV2YWx1ZVaWCTfSflV1rQ5oyjtY5yxWyNE7SuO2
