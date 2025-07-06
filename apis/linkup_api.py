@@ -342,7 +342,7 @@ def generate_qr_api():
         qr_img = create_card_style_qr(f"user_{tg_id}", username)
         if qr_img is not None:
             width, height = qr_img.size
-            crop_margin = int(width * 0.18)
+            crop_margin = int(width * 0.12)
             left = crop_margin
             right = width - crop_margin
             qr_img = qr_img.crop((left, 0, right, height))

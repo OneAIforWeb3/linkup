@@ -107,38 +107,23 @@ def create_card_style_qr(qr_data, username, size=(1200, 675), qr_color=(0, 0, 0)
         # Add username text below QR code
         draw = ImageDraw.Draw(card)
         
-        # Try to load fonts
-        font_paths = [
-            "/System/Library/Fonts/Helvetica.ttc",  # macOS
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
-            "arial.ttf",  # Windows
-        ]
-        
-        username_font = None
-        for font_path in font_paths:
-            try:
-                username_font = ImageFont.truetype(font_path, 44)  # Smaller font size
-                break
-            except (OSError, IOError):
-                continue
-        
-        # Fallback to default if no fonts found
-        if username_font is None:
+        # Always use bundled font
+        FONT_PATH = os.path.join(os.path.dirname(__file__), "fonts", "DejaVuSans-Bold.ttf")
+        try:
+            username_font = ImageFont.truetype(FONT_PATH, 55)
+        except (OSError, IOError):
             username_font = ImageFont.load_default()
         
         # Format the username
         if username:
             username_text = f"@{username}" if not username.startswith('@') else username
-            
             # Get text width
             bbox = draw.textbbox((0, 0), username_text, font=username_font)
             username_width = bbox[2] - bbox[0]
             username_height = bbox[3] - bbox[1]
-            
             # Position username just below the QR code, with a bit more padding
             username_x = container_x + (qr_container_width - username_width) // 2
             username_y = qr_y + qr_size + 32  # 32px padding below QR code
-            
             # Add subtle shadow for better readability
             for offset in range(3, 0, -1):
                 draw.text(
@@ -161,11 +146,3 @@ def create_card_style_qr(qr_data, username, size=(1200, 675), qr_color=(0, 0, 0)
         print(f"Card QR generation failed: {e}")
         return None
 
-# QR color options
-QR_COLORS = {
-    'blue': (0, 155, 208),  # ETH Cannes blue
-    'purple': (147, 51, 234),  # Vibrant purple
-    'orange': (251, 146, 60),  # Vibrant orange
-    'green': (34, 197, 94),  # Vibrant green
-    'red': (239, 68, 68),  # Vibrant red
-}
