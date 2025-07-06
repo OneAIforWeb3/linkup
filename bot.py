@@ -1599,6 +1599,15 @@ async def generate_qr_from_callback(query, context):
             "❌ **QR Code generation failed**\n\n"
             "Please try the /myqr command instead."
         )
+# QR color options
+QR_COLORS = {
+    'blue': (0, 155, 208),  # ETH Cannes blue
+    'purple': (147, 51, 234),  # Vibrant purple
+    'orange': (251, 146, 60),  # Vibrant orange
+    'green': (34, 197, 94),  # Vibrant green
+    'red': (239, 68, 68),  # Vibrant red
+}
+
 
 async def show_themed_qr_menu(query, context):
     """Show themed QR code menu"""
